@@ -4,8 +4,6 @@
 
 Web app that connects a **Bosch GLM 50-27 CG** laser distance meter to an Android phone over Bluetooth LE. Take readings from the phone, log them with photos, GPS and phone tilt, and run continuous "slider" scans to profile a surface.
 
-**Open the app:** https://volkov596.github.io/REPO-NAME/
-
 ## What it does
 
 - **Remote trigger:** take a reading from the phone. Readings taken with the meter button are logged too.
