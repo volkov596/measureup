@@ -25,12 +25,10 @@ Web app that connects a **Bosch GLM 50-27 CG** laser distance meter to an Androi
 3. Tap **Connect** and pick the meter from the list.
 4. Tap **Measure**.
 
-After an update, add `?v=` plus any number to the link to skip the cache. The version is shown at the bottom of the page.
-
 ## Status and known limits
 
 - Uses an **undocumented Bluetooth protocol** worked out by testing. A firmware update could change it, and other units may behave differently.
-- Tested with one meter and one phone (Motorola).
+- Tested with one meter and one phone.
 - Bench repeatability: about 0.1 mm at 2–4 m, about 0.75 mm at 12–16 m. Accuracy against a reference is **not yet checked**; Bosch spec is ±1.5 mm.
 - Scan readings are not shown on the meter or saved to its memory.
 - Keep the app on screen during scans. Chrome slows it down in the background.
@@ -39,5 +37,3 @@ After an update, add `?v=` plus any number to the link to skip the cache. The ve
 ## Disclaimer
 
 Independent hobby project. Not affiliated with or endorsed by Bosch. Bosch and GLM are trademarks of Robert Bosch GmbH. Provided as is, with no warranty. Use at your own risk.
-
-Class 2 laser: don't look into the beam or point it at people.
