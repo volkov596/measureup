@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Measure Up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#15803D;
+  --bg:#F3F6F4; --panel:#FFFFFF; --ink:#13201A; --muted:#5B6B62; --line:#D5DED8;
+  --laser:#19C24A; --laser-ink:#062611; --warn:#B87400; --err:#C62828; --ok:#15803D; --series-1:#2a78d6; --grid:#E4EAE6;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0D1511; --panel:#16211B; --ink:#E6EFE9; --muted:#93A69B; --line:#2A3A31; --brand:#2BD65C;
+  --laser:#2BD65C; --laser-ink:#04210D; --warn:#F0B429; --err:#FF6B6B; --ok:#4ADE80; --series-1:#3987e5; --grid:#243029; } }
+:root[data-theme="dark"]{ --brand:#2BD65C; --bg:#0D1511; --panel:#16211B; --ink:#E6EFE9; --muted:#93A69B; --line:#2A3A31;
+  --laser:#2BD65C; --laser-ink:#04210D; --warn:#F0B429; --err:#FF6B6B; --ok:#4ADE80; --series-1:#3987e5; --grid:#243029; }
+*,*::before,*::after{box-sizing:inherit}
+details > *{box-sizing:border-box}   /* Chrome puts details content in a content-box slot; restore border-box for everything inside */
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.35}
+button,select,input{font:inherit;color:inherit}
+
+/* layout: portrait stacks in DOM order; landscape rules are at the end of this sheet (they must come after .view) */
+main{max-width:560px;margin:0 auto;padding:8px 12px 24px;display:grid;gap:8px;grid-template-columns:minmax(0,1fr)}
+/* stage = live view with the reading and Measure laid over its lower part (no live view: plain stack) */
+.stage{display:flex;flex-direction:column;gap:8px}
+body:not(.appmode) .stage{position:relative;justify-content:flex-end;gap:0;min-height:300px;height:min(64vh,150vw);height:min(64dvh,150vw);
+  border-radius:12px;overflow:hidden;background:#000}
+.hud{display:flex;flex-direction:column;gap:8px}
+body:not(.appmode) .hud{position:relative;z-index:1;padding:44px 12px 12px;color:#E6EFE9;text-shadow:0 1px 3px rgba(0,0,0,.6);
+  background:linear-gradient(to top,rgba(0,0,0,.8) 0%,rgba(0,0,0,.62) 55%,rgba(0,0,0,0) 100%)}
+body:not(.appmode) .hud .side span,body:not(.appmode) .hud .sub{color:rgba(230,239,233,.8)}
+body:not(.appmode) .hud .measure{text-shadow:none}
+body:not(.appmode) .hud .measure:disabled{background:rgba(255,255,255,.2);color:rgba(230,239,233,.75)}
+.camre{position:absolute;top:8px;right:8px;z-index:2;width:40px;height:40px;border-radius:50%;border:0;padding:0;
+  background:rgba(0,0,0,.38);color:#E6EFE9;font-size:22px;line-height:40px}
+body.appmode .camre{display:none}
+details.sub2 .toggle{font-size:15px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 10px;align-items:end}
+.bar{display:flex;align-items:center;gap:10px}
+.state{flex:1;min-width:0}
+.state b{display:block;font-size:16px}
+.state span{display:block;color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none}
+.dot.on{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.err{background:var(--err)}
+.btn{border:2px solid var(--ink);background:transparent;border-radius:10px;padding:3px 12px;font-weight:700;font-size:15px;line-height:1.2;min-height:36px}
+.btn:disabled{opacity:.4}
+
+.view{position:absolute;inset:0;background:#000;overflow:hidden}
+body.appmode .view{display:none}
+.view video{width:100%;height:100%;object-fit:cover;display:block}
+.view .empty{position:absolute;inset:0;display:grid;place-items:center;color:#cfd8d2;text-align:center;padding:16px;font-size:14px}
+.cross{position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;pointer-events:none}
+.cross::before,.cross::after{content:"";position:absolute;background:var(--laser)}
+.cross::before{left:19px;top:0;width:2px;height:40px}.cross::after{top:19px;left:0;height:2px;width:40px}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
+.flash.go{opacity:.7;transition:none}
+
+.read{display:grid;grid-template-columns:1fr auto;align-items:end;gap:2px 12px}
+.big{font-size:44px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.big small{font-size:20px;font-weight:400;margin-left:4px}
+.side{text-align:right;font-variant-numeric:tabular-nums}
+.side div{font-size:22px;font-weight:700}
+.side span{color:var(--muted);font-size:13px}
+.sub{grid-column:1/-1;color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+
+.measure{width:100%;border:0;border-radius:14px;background:var(--laser);color:var(--laser-ink);
+  font-size:22px;font-weight:700;min-height:60px;box-shadow:0 3px 0 rgba(0,0,0,.25)}
+.measure:active{transform:translateY(2px);box-shadow:none}
+.measure:disabled{background:var(--line);color:var(--muted);box-shadow:none}
+.msg{min-height:20px;font-size:14px;margin:0 2px 2px}
+.msg.err{color:var(--err)} .msg.warn{color:var(--warn)} .msg.ok{color:var(--ok)}
+.toggles{display:flex;gap:6px 16px;flex-wrap:wrap}
+.toggle{display:flex;align-items:center;gap:8px;min-height:40px}
+.toggle input{width:22px;height:22px;accent-color:var(--laser);margin:0;flex:none}
+.toggle.off{opacity:.45}
+.hint{font-size:13px;color:var(--muted);margin:0 2px}
+
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:8px}
+details summary{cursor:pointer;font-weight:700;min-height:36px;display:flex;align-items:center}
+.log{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto}
+.log li{padding:6px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums;font-size:14px}
+.log li:first-child{border-top:0}
+.log .t{color:var(--muted);font-size:12px}
+.row{display:flex;gap:8px;align-items:center;margin:6px 0}
+label.f{display:block;font-size:13px;color:var(--muted);margin:6px 0}
+label.f input{display:block;box-sizing:border-box;width:100%;margin-top:4px;font-size:17px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.help{font-size:13px;color:var(--muted);margin:6px 0}
+:focus-visible{outline:3px solid var(--laser);outline-offset:2px}
+.btn.sm{min-height:32px;padding:2px 10px;font-size:14px}
+.scanitem .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+details.sub2{border-top:1px solid var(--line);margin-top:6px;padding-top:2px}
+details.sub2 summary{font-weight:700;font-size:14px;min-height:40px}
+.sv{border:1px solid var(--line);border-radius:10px;padding:8px;margin:8px 0;background:var(--bg)}
+.sv .head{display:flex;align-items:center;gap:8px}
+.sv .head b{flex:1;min-width:0;font-size:14px}
+.seg{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
+.seg button{font:inherit;font-size:13px;padding:4px 10px;min-height:36px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px}
+.seg button[aria-pressed="true"]{border-color:var(--ink);font-weight:700}
+.svopts{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:13px}
+.svopts select,.svopts input[type=number]{font-size:15px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.svopts input[type=number]{width:80px}
+.svopts .toggle{min-height:36px}
+.svtip{font-size:12px;color:var(--muted);min-height:40px;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+.svtip b{color:var(--ink);font-size:15px}
+.svchart svg{display:block;width:100%;touch-action:pan-y}
+.svchart .tick{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.svchart .alab{fill:var(--muted);font-size:11px}
+/* compact label + field rows (options) */
+.kv{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:14px;color:var(--muted)}
+.kv label{flex:1;min-width:0}
+.kv input{width:130px;flex:none;font-size:16px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.kv + .help{margin-top:-2px}
+/* brand: footer wordmark + overlay on the live view */
+.wm{font-weight:400;letter-spacing:-.4px;color:var(--muted);white-space:nowrap}
+.wm b{font-weight:700;color:var(--brand)}
+.foot{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:12px 2px 4px}
+.foot .wm{font-size:24px;line-height:1}
+.chip{font-size:12px;font-weight:700;color:var(--brand);border:1.5px solid var(--brand);border-radius:999px;padding:1px 9px;line-height:1.45}
+.foot .ver{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ovl{position:absolute;left:10px;top:8px;font-size:15px;padding:2px 8px;border-radius:8px;background:rgba(0,0,0,.32);color:rgba(230,239,233,.78);pointer-events:none}
+.ovl b{color:rgba(43,214,92,.88)}
+
+/* landscape: live view, reading and Measure stay on the left (sticky); status, options and lists scroll on the right */
+@media (orientation: landscape) and (min-aspect-ratio: 5/4){
+  main{max-width:none;padding:8px 14px;column-gap:16px;row-gap:8px;grid-template-columns:minmax(0,56fr) minmax(0,44fr);
+    grid-template-areas:"stage bar" "stage opts" "stage more";grid-template-rows:auto auto 1fr;align-items:start}
+  .bar{grid-area:bar} .opts{grid-area:opts} .more{grid-area:more}
+  .stage{grid-area:stage}
+  body:not(.appmode) .stage{position:sticky;top:8px;min-height:240px;
+    height:calc(100vh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+    height:calc(100dvh - 16px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
+  body:not(.appmode) .hud{flex-direction:row;align-items:flex-end;gap:12px;padding-top:30px}
+  body:not(.appmode) .hud .read{flex:1;min-width:0}
+  body:not(.appmode) .hud .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body:not(.appmode) .hud .measure{width:46%;flex:none}
+  .stage .big{font-size:34px} .stage .big small{font-size:17px} .stage .side div{font-size:18px} .stage .sub{font-size:13px}
+  .stage .measure{min-height:50px;font-size:20px}
+  body.appmode main{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"bar more" "stage more" "opts more"}
+  body.appmode .stage{position:static;height:auto}
+}
+@media (prefers-reduced-motion: reduce){.flash{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <div class="dot" id="dot"></div>
+    <div class="state"><b id="stTitle">Not connected</b><span id="stSub">Switch the meter's Bluetooth on, then connect.</span></div>
+    <button class="btn" id="btnConnect">Connect</button>
+  </div>
+
+  <div class="stage">
+  <div class="view" id="view">
+    <video id="video" playsinline muted></video>
+    <div class="empty" id="camEmpty">Starting camera…</div>
+    <div class="cross" id="cross" hidden></div>
+    <div class="flash" id="flash"></div>
+    <div class="ovl wm" aria-hidden="true">Measure<b>Up</b></div>
+  </div>
+  <button class="camre" id="btnCamRe" aria-label="Restart camera" title="Restart camera">⟳</button>
+  <div class="hud">
+
+  <div class="read" aria-live="polite">
+    <div class="big" id="rDist">–<small>m</small></div>
+    <div class="side"><div id="rAng">–</div><span>angle</span></div>
+    <div class="sub" id="rSub">No readings yet</div>
+  </div>
+
+  <button class="measure" id="btnMeasure" disabled>Measure</button>
+  </div>
+  </div>
+
+  <div class="opts">
+    <div class="msg" id="msg"></div>
+    <div class="toggles">
+      <label class="toggle"><input type="checkbox" id="optPhoto"> Photo</label>
+      <label class="toggle" id="tglFull"><input type="checkbox" id="optFull"> Full quality</label>
+    </div>
+    <p class="hint" id="hint"></p>
+    <p class="hint" id="lastPhoto"></p>
+    <input type="file" id="fileIn" accept="image/*" capture="environment" hidden>
+  </div>
+
+  <div class="more">
+    <section>
+      <details id="scanBox">
+        <summary id="scanTitle">Scan (slider)</summary>
+        <p class="help">Takes distance readings back to back (about 2.5 per second). Set the meter to single distance mode, point it straight down or up, and don't press its buttons during a scan.</p>
+        <div class="row"><button class="btn" id="btnScan" disabled>Start scan</button><button class="btn" id="btnScanStop" disabled>Stop</button></div>
+        <div class="help" id="scanStat"></div>
+        <div class="sv" id="sv" hidden>
+          <div class="head"><b id="svTitle"></b><button class="btn sm" id="svClose">Close</button></div>
+          <div class="seg" id="svRanges" role="group" aria-label="Range"></div>
+          <div class="svopts">
+            <select id="svMode" aria-label="What to plot">
+              <option value="tilt">Height, tilt removed</option>
+              <option value="flat">Height, as measured</option>
+              <option value="dist">Distance</option>
+            </select>
+            <label>Speed <input id="svSpeed" type="number" inputmode="decimal" step="0.01" min="0" placeholder="mm/s"></label>
+            <label class="toggle"><input type="checkbox" id="svTrue"> True scale</label>
+            <label class="toggle"><input type="checkbox" id="svFlip"> Upside down</label>
+          </div>
+          <div class="svtip" id="svTip">Touch the chart to read values.</div>
+          <div class="svchart" id="svChart"><svg id="svSvg" role="img" aria-label="Scan profile"></svg></div>
+          <p class="help" id="svNote"></p>
+        </div>
+        <ul class="log" id="scanList"></ul>
+        <div class="row">
+          <button class="btn" id="btnScanCsv">Export all scans</button>
+          <button class="btn" id="btnScanClear">Delete all</button>
+        </div>
+        <details class="sub2" id="scanSet">
+          <summary>Scan settings</summary>
+          <div class="grid2">
+            <label class="f">Label<input id="scLabel" type="text" maxlength="40" placeholder="optional"></label>
+            <label class="f">Speed, mm/s<input id="scSpeed" type="number" inputmode="decimal" step="0.01" min="0" placeholder="optional"></label>
+            <label class="f">Min gap, ms (0 = fastest)<input id="scInt" type="number" inputmode="numeric" step="50" min="0"></label>
+            <label class="f">Stop after, min<input id="scMax" type="number" inputmode="decimal" step="1" min="0.1"></label>
+          </div>
+          <div class="row"><label class="toggle"><input type="checkbox" id="scAuto"> Save CSV automatically</label></div>
+          <div class="row"><label class="toggle"><input type="checkbox" id="scHb"> Avoid meter sync pulse (fewer dropouts)</label></div>
+          <p class="help">Keep the browser open with the screen on. Readings go to the phone only, not the meter. If Bluetooth drops, the scan carries on if it reconnects within 20 s.</p>
+        </details>
+      </details>
+    </section>
+    <section>
+      <details id="logBox">
+      <summary id="logTitle">Readings</summary>
+      <ul class="log" id="log"></ul>
+      <div class="row">
+        <button class="btn" id="btnCsv">Export CSV</button>
+        <button class="btn" id="btnClear">Clear log</button>
+      </div>
+      </details>
+    </section>
+    <section>
+      <details>
+        <summary>Offset and options</summary>
+        <div class="kv"><label for="offZ">Distance offset Z (mm)</label><input id="offZ" type="number" inputmode="decimal" step="0.5"></div>
+        <p class="help">Meter rear edge ahead of the camera sensor (negative if behind). The reading without offset is saved too.</p>
+        <div class="kv"><label for="prefix">File name prefix</label><input id="prefix" type="text"></div>
+        <div class="row"><label class="toggle"><input type="checkbox" id="optGps"> Save GPS location</label></div>
+        <div class="row"><label class="toggle" id="tglDev"><input type="checkbox" id="optDevPhoto"> Also photograph readings taken with the meter's button (in-browser camera only)</label></div>
+        <div class="row"><label class="toggle"><input type="checkbox" id="optFrames"> Save a Bluetooth frame log (diagnostic, for readings and scans)</label></div>
+      </details>
+    </section>
+    <div class="foot"><span class="wm">Measure<b>Up</b></span><span class="chip">Experimental</span><span class="ver" id="ver"></span></div>
+  </div>
+</main>
+
+<script>
+// ===== GLM core: protocol, geometry, EXIF =====
+const GLM = {};
+
+GLM.SERVICE = '02a6c0d0-0451-4000-b000-fb3210111989';
+GLM.CHAR = '02a6c0d1-0451-4000-b000-fb3210111989';
+
+GLM.crc8 = function (bytes) {
+  let c = 0xAA;
+  for (const b of bytes) {
+    c ^= b;
+    for (let i = 0; i < 8; i++) c = (c & 0x80) ? ((c << 1) ^ 0xA6) & 0xFF : (c << 1) & 0xFF;
+  }
+  return c;
+};
+
+GLM.frame = function (cmd, payload = []) {
+  const f = [0xC0, cmd, payload.length, ...payload];
+  f.push(GLM.crc8(f));
+  return new Uint8Array(f);
+};
+GLM.CMD_SYNC_ON = GLM.frame(0x55, [0x01, 0x00]); // C0 55 02 01 00 1A
+GLM.CMD_BUTTON = GLM.frame(0x56, [0x00]);        // C0 56 01 00 1E
+GLM.CMD_DIRECT = GLM.frame(0x40, []);            // C0 40 00 EE  direct measure: reply 00 04 <uint32 LE x 0.05 mm>
+
+GLM.TYPES = {
+  0x04: 'Distance', 0x08: 'Continuous', 0x21: 'Angle', 0x28: 'Indirect height',
+  0x2C: 'Indirect (2C)', 0x58: 'Level', 0x00: 'Laser event', 0xF0: 'Mode change', 0xFC: 'Meter error'
+};
+GLM.MODES = { 1: 'Distance', 2: 'Continuous', 8: 'Level / angle', 10: 'Indirect height', 11: 'Indirect (2C)' };
+
+// Streaming frame parser. feed(bytes) returns array of decoded frames.
+GLM.Parser = function () {
+  let buf = [];
+  this.feed = function (bytes) {
+    buf.push(...bytes);
+    const out = [];
+    while (buf.length >= 3) {
+      const isReq = buf[0] === 0xC0;
+      const len = isReq ? buf[2] : buf[1];
+      const total = isReq ? len + 4 : len + 3;
+      if (buf.length < total) break;
+      const fr = buf.slice(0, total);
+      if (GLM.crc8(fr.slice(0, -1)) !== fr[total - 1]) { out.push({ kind: 'bad', raw: fr }); buf = []; break; }
+      buf = buf.slice(total);
+      if (isReq) out.push(GLM.decodeRequest(fr[1], fr.slice(3, 3 + len), fr));
+      else out.push({ kind: 'reply', status: fr[0] & 0x3F, payload: fr.slice(2, 2 + len), raw: fr });
+    }
+    return out;
+  };
+};
+
+GLM.decodeRequest = function (cmd, p, raw) {
+  if (cmd === 0x11) return { kind: 'heartbeat', raw };
+  if (cmd === 0x55 && p.length >= 16) {
+    const dv = new DataView(new Uint8Array(p).buffer);
+    const f = [dv.getFloat32(4, true), dv.getFloat32(8, true), dv.getFloat32(12, true)];
+    const r = { kind: 'sync', type: p[0], flag: p[1], counter: p[2] | (p[3] << 8), f, raw };
+    switch (p[0]) {
+      case 0x04: r.measurement = true; r.distance = f[0]; break;
+      case 0x28: r.measurement = true; r.height = f[0]; r.distance = f[1]; r.angle = f[2]; break;
+      case 0x2C: r.measurement = true; r.other = f[0]; r.distance = f[1]; r.angle = f[2]; break;
+      case 0x21: r.measurement = true; r.angle = f[0]; break;
+      case 0x58: r.measurement = true; r.angle = f[0]; r.angle2 = f[1]; break;
+      case 0x08: r.measurement = true; r.distance = f[0]; r.min = f[1]; r.max = f[2]; break;
+      case 0x00: r.laser = p[1] === 1; break;
+      case 0xF0: r.mode = Math.round(f[0]); break;
+      case 0xFC: r.error = true; break;
+    }
+    return r;
+  }
+  return { kind: 'request', cmd, payload: p, raw };
+};
+
+// Geometry. Offsets (mm) = meter reference point relative to camera sensor,
+// camera frame: X right, Y up, Z forward (toward target). Laser parallel to camera axis.
+GLM.geometry = function (d, angleDeg, off) {
+  if (d == null) return {};
+  const X = (off.x || 0) / 1000, Y = (off.y || 0) / 1000, Z = (off.z || 0) / 1000;
+  const fwd = d + Z;
+  const g = { camDist: Math.sqrt(X * X + Y * Y + fwd * fwd), camAxial: fwd };
+  if (angleDeg != null) {
+    const t = angleDeg * Math.PI / 180;
+    g.rise = fwd * Math.sin(t) + Y * Math.cos(t);
+    g.horiz = fwd * Math.cos(t) - Y * Math.sin(t);
+  }
+  return g;
+};
+
+// ---------- EXIF ----------
+// Returns orientation (1-8) from an existing JPEG's EXIF, or 1.
+GLM.readOrientation = function (u8) {
+  let p = 2;
+  while (p + 4 < u8.length && u8[p] === 0xFF) {
+    const m = u8[p + 1], len = (u8[p + 2] << 8) | u8[p + 3];
+    if (m === 0xE1 && u8[p + 4] === 0x45 && u8[p + 5] === 0x78) {
+      const t = p + 10, le = u8[t] === 0x49;
+      const r16 = o => le ? u8[t + o] | (u8[t + o + 1] << 8) : (u8[t + o] << 8) | u8[t + o + 1];
+      const r32 = o => le ? (u8[t + o] | (u8[t + o + 1] << 8) | (u8[t + o + 2] << 16) | (u8[t + o + 3] << 24)) >>> 0
+                          : ((u8[t + o] << 24) | (u8[t + o + 1] << 16) | (u8[t + o + 2] << 8) | u8[t + o + 3]) >>> 0;
+      const ifd = r32(4), n = r16(ifd);
+      for (let i = 0; i < n; i++) if (r16(ifd + 2 + i * 12) === 0x0112) return r16(ifd + 2 + i * 12 + 8) || 1;
+      return 1;
+    }
+    if (m === 0xDA) break;
+    p += 2 + len;
+  }
+  return 1;
+};
+
+GLM.jpegSize = function (u8) {
+  let p = 2;
+  while (p + 9 < u8.length && u8[p] === 0xFF) {
+    const m = u8[p + 1], len = (u8[p + 2] << 8) | u8[p + 3];
+    if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC)
+      return { h: (u8[p + 5] << 8) | u8[p + 6], w: (u8[p + 7] << 8) | u8[p + 8] };
+    p += 2 + len;
+  }
+  return null;
+};
+
+// Remove existing APP1 (EXIF/XMP) segments and insert a new EXIF block.
+GLM.writeExif = function (jpeg, meta) {
+  const enc = s => Array.from(new TextEncoder().encode(s));
+  const ascii = s => [...enc(s.replace(/[^\x20-\x7E]/g, '?')), 0];
+  // build IFDs as lists of {tag,type,count,data(bytes)}
+  const T = { BYTE: 1, ASCII: 2, SHORT: 3, LONG: 4, RATIONAL: 5, UNDEF: 7 };
+  const u16 = v => [v & 255, (v >> 8) & 255];
+  const u32 = v => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+  const rat = (n, d) => [...u32(n), ...u32(d)];
+  const e = (tag, type, count, data) => ({ tag, type, count, data });
+  const utf16 = s => { const o = []; for (const ch of s + '\0') { const v = ch.charCodeAt(0); o.push(v & 255, v >> 8); } return o; };
+
+  const ifd0 = [
+    e(0x010E, T.ASCII, 0, ascii(meta.description)),
+    e(0x010F, T.ASCII, 0, ascii(meta.make || 'Bosch GLM 50-27 CG + phone')),
+    e(0x0112, T.SHORT, 1, u16(meta.orientation || 1)),
+    e(0x0131, T.ASCII, 0, ascii('Measure Up')),
+    e(0x0132, T.ASCII, 0, ascii(meta.datetime)),
+    e(0x011A, T.RATIONAL, 1, rat(72, 1)),
+    e(0x011B, T.RATIONAL, 1, rat(72, 1)),
+    e(0x0128, T.SHORT, 1, u16(2)),
+    e(0x0213, T.SHORT, 1, u16(1)),
+    e(0x8769, T.LONG, 1, u32(0)) // exif pointer, patched
+  ];
+  if (meta.xpTitle) { const d = utf16(meta.xpTitle); ifd0.push(e(0x9C9B, T.BYTE, d.length, d)); }
+  if (meta.xpComment) { const d = utf16(meta.xpComment); ifd0.push(e(0x9C9C, T.BYTE, d.length, d)); }
+  const uc = [0x41, 0x53, 0x43, 0x49, 0x49, 0, 0, 0, ...enc(meta.userComment)];
+  const exif = [
+    e(0x9003, T.ASCII, 0, ascii(meta.datetime)),
+    e(0x9286, T.UNDEF, uc.length, uc),
+    e(0x9291, T.ASCII, 0, ascii(meta.subsec || '000')),
+    e(0x9000, T.UNDEF, 4, [0x30, 0x32, 0x33, 0x32]),
+    e(0x9101, T.UNDEF, 4, [1, 2, 3, 0]),
+    e(0xA000, T.UNDEF, 4, [0x30, 0x31, 0x30, 0x30]),
+    e(0xA001, T.SHORT, 1, u16(1))
+  ];
+  const sz = GLM.jpegSize(jpeg);
+  if (sz) { exif.push(e(0xA002, T.LONG, 1, u32(sz.w))); exif.push(e(0xA003, T.LONG, 1, u32(sz.h))); }
+  exif.sort((a, b) => a.tag - b.tag);
+  let gps = null;
+  if (meta.gps) {
+    ifd0.push(e(0x8825, T.LONG, 1, u32(0)));
+    const dms = v => { v = Math.abs(v); const d = Math.floor(v), m = Math.floor((v - d) * 60), s = ((v - d) * 60 - m) * 60;
+      return [...rat(d, 1), ...rat(m, 1), ...rat(Math.round(s * 10000), 10000)]; };
+    gps = [
+      e(0x0000, T.BYTE, 4, [2, 3, 0, 0]),
+      e(0x0001, T.ASCII, 2, [meta.gps.lat >= 0 ? 0x4E : 0x53, 0]),
+      e(0x0002, T.RATIONAL, 3, dms(meta.gps.lat)),
+      e(0x0003, T.ASCII, 2, [meta.gps.lon >= 0 ? 0x45 : 0x57, 0]),
+      e(0x0004, T.RATIONAL, 3, dms(meta.gps.lon))
+    ];
+    if (meta.gps.alt != null) {
+      gps.push(e(0x0005, T.BYTE, 1, [meta.gps.alt < 0 ? 1 : 0]));
+      gps.push(e(0x0006, T.RATIONAL, 1, rat(Math.round(Math.abs(meta.gps.alt) * 100), 100)));
+    }
+  }
+  for (const list of [ifd0, exif, gps || []]) for (const x of list) if (x.type === T.ASCII && !x.count) x.count = x.data.length;
+
+  // layout: header(8) | ifd0 | exif | gps, each IFD followed by its overflow data
+  const size = l => 2 + l.length * 12 + 4 + l.reduce((s, x) => s + (x.data.length > 4 ? x.data.length + (x.data.length & 1) : 0), 0);
+  const off0 = 8, offE = off0 + size(ifd0), offG = offE + size(exif);
+  ifd0.sort((a, b) => a.tag - b.tag);
+  ifd0.find(x => x.tag === 0x8769).data = u32(offE);
+  if (gps) { ifd0.find(x => x.tag === 0x8825).data = u32(offG); gps.sort((a, b) => a.tag - b.tag); }
+  const out = [0x49, 0x49, 0x2A, 0x00, ...u32(8)];
+  const writeIfd = (l, start) => {
+    let dataOff = start + 2 + l.length * 12 + 4;
+    const head = [...u16(l.length)], tail = [];
+    for (const x of l) {
+      head.push(...u16(x.tag), ...u16(x.type), ...u32(x.count));
+      if (x.data.length <= 4) head.push(...x.data, ...new Array(4 - x.data.length).fill(0));
+      else { head.push(...u32(dataOff)); tail.push(...x.data); if (x.data.length & 1) tail.push(0); dataOff += x.data.length + (x.data.length & 1); }
+    }
+    head.push(0, 0, 0, 0);
+    out.push(...head, ...tail);
+  };
+  writeIfd(ifd0, off0); writeIfd(exif, offE); if (gps) writeIfd(gps, offG);
+
+  const app1Body = [0x45, 0x78, 0x69, 0x66, 0, 0, ...out];
+  const segLen = app1Body.length + 2;
+  if (segLen > 65535) throw new Error('EXIF block too large');
+  const app1 = [0xFF, 0xE1, segLen >> 8, segLen & 255, ...app1Body];
+
+  // strip existing APP1 segments
+  const parts = [jpeg.subarray(0, 2)];
+  let p = 2;
+  while (p + 4 <= jpeg.length && jpeg[p] === 0xFF) {
+    const m = jpeg[p + 1];
+    if (m === 0xDA) break;
+    const len = (jpeg[p + 2] << 8) | jpeg[p + 3];
+    if (m !== 0xE1) parts.push(jpeg.subarray(p, p + 2 + len));
+    p += 2 + len;
+  }
+  parts.push(jpeg.subarray(p));
+  // insert APP1 right after SOI (and after APP0/JFIF if present)
+  const res = [parts[0]];
+  let i = 1;
+  if (parts[1] && parts[1][1] === 0xE0) { res.push(parts[1]); i = 2; }
+  res.push(new Uint8Array(app1), ...parts.slice(i));
+  const total = res.reduce((s, x) => s + x.length, 0), u8 = new Uint8Array(total);
+  let o = 0; for (const x of res) { u8.set(x, o); o += x.length; }
+  return u8;
+};
+
+
+// ---------- XMP (keeps the camera's own EXIF untouched) ----------
+GLM.XMP_NS = 'http://ns.adobe.com/xap/1.0/\0';
+GLM.writeXmp = function (jpeg, f) {
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const props = Object.entries(f.props || {}).filter(([, v]) => v != null && v !== '')
+    .map(([k, v]) => `   <glm:${k.replace(/[^A-Za-z0-9_]/g, '_')}>${esc(v)}</glm:${k.replace(/[^A-Za-z0-9_]/g, '_')}>`).join('\n');
+  const desc = `  <rdf:Description rdf:about=""
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:glm="http://ns.glm-photo-logger.org/1.0/">
+   <dc:title><rdf:Alt><rdf:li xml:lang="x-default">${esc(f.title)}</rdf:li></rdf:Alt></dc:title>
+   <dc:description><rdf:Alt><rdf:li xml:lang="x-default">${esc(f.description)}</rdf:li></rdf:Alt></dc:description>
+${props}
+   <glm:json>${esc(f.json || '')}</glm:json>
+  </rdf:Description>`;
+  const enc = new TextEncoder(), dec = new TextDecoder();
+  const nsBytes = enc.encode(GLM.XMP_NS);
+  const isXmp = seg => seg[1] === 0xE1 && seg.length > 4 + nsBytes.length &&
+    nsBytes.every((b, i) => seg[4 + i] === b);
+  // split into segments up to SOS
+  const segs = []; let p = 2;
+  while (p + 4 <= jpeg.length && jpeg[p] === 0xFF) {
+    const m = jpeg[p + 1];
+    if (m === 0xDA) break;
+    const len = (jpeg[p + 2] << 8) | jpeg[p + 3];
+    segs.push(jpeg.subarray(p, p + 2 + len)); p += 2 + len;
+  }
+  const rest = jpeg.subarray(p);
+  let packet, idx = segs.findIndex(isXmp);
+  if (idx >= 0) {
+    const old = dec.decode(segs[idx].subarray(4 + nsBytes.length));
+    const cut = old.lastIndexOf('</rdf:RDF>');
+    packet = cut >= 0 ? old.slice(0, cut) + desc + '\n ' + old.slice(cut) : null;
+  }
+  if (!packet) packet = `<?xpacket begin="\ufeff" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+${desc}
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>`;
+  const body = [...nsBytes, ...enc.encode(packet)];
+  if (body.length + 2 > 65535) throw new Error('XMP block too large');
+  const seg = new Uint8Array([0xFF, 0xE1, (body.length + 2) >> 8, (body.length + 2) & 255, ...body]);
+  if (idx >= 0) segs[idx] = seg;
+  else {
+    // insert after the last leading APP0/APP1 (JFIF / EXIF) segment
+    let at = 0; while (at < segs.length && (segs[at][1] === 0xE0 || segs[at][1] === 0xE1)) at++;
+    segs.splice(at, 0, seg);
+  }
+  const parts = [jpeg.subarray(0, 2), ...segs, rest];
+  const out = new Uint8Array(parts.reduce((s, x) => s + x.length, 0));
+  let o = 0; for (const x of parts) { out.set(x, o); o += x.length; }
+  return out;
+};
+
+
+
+</script>
+<script>
+(function(){
+const $ = id => document.getElementById(id);
+const VERSION = '0.13.0';
+const S = { dev:null, ch:null, connected:false, laser:false, mode:null, lastBeat:0, busy:false,
+  pending:null, stream:null, imgCap:null, pitch:null, roll:null, gps:null, gpsWatch:null, wake:null, wantConnected:false };
+const parser = new GLM.Parser();
+const SC = { on:false, stopReq:false, cur:null, pending:null, sentAt:0, t0:0, hb:[] };   // scan state; hb = heartbeat arrival times
+// Frame logs: during a scan into the scan (ms since scan start); otherwise, if enabled, into the readings frame log (UTC time).
+let rframes = [], rfTimer = null;
+function flog(dir, hex, label){
+  if (SC.on){ if (SC.cur && SC.cur.frames) SC.cur.frames.push([Math.round(performance.now()-SC.t0), dir, hex||'', label||'']); return; }
+  if (!cfg.frames) return;
+  rframes.push([new Date().toISOString(), dir, hex||'', label||'']);
+  if (rframes.length > 5000) rframes = rframes.slice(-5000);
+  if (!rfTimer) rfTimer = setTimeout(saveRframes, 2000);
+}
+function saveRframes(){ rfTimer=null; store.set('rframes', rframes); }
+
+// ---------- storage ----------
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem('glm.'+k); return v==null? d : JSON.parse(v);}catch(e){return d;} },
+  set(k, v){ try{ localStorage.setItem('glm.'+k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+};
+const cfg = Object.assign({z:0,prefix:'MeasureUp',photo:false,gps:false,devPhoto:true,source:'app',frames:false}, store.get('cfg',{}));
+delete cfg.wm; delete cfg.rframes;
+rframes = store.get('rframes', []);
+const browserCam = () => cfg.photo && cfg.source==='browser';
+const appCam = () => cfg.photo && cfg.source==='app';
+cfg.photo = true; // always start with photos on
+let log = store.get('log', []).map(r=>{
+  if (!('cam_to_dot_m' in r) && !('rise_m' in r)) return r;       // already new format
+  const n=Object.assign({}, r);
+  n.distance_no_offset_m = r.distance_m;
+  n.distance_m = r.cam_axial_m ?? r.cam_to_dot_m ?? r.distance_m;
+  n.vertical_m = r.rise_m ?? null; n.horizontal_m = r.horiz_m ?? null; n.meter_height_m = r.height_m_meter ?? null;
+  for (const k of ['cam_to_dot_m','cam_axial_m','rise_m','horiz_m','height_m_meter','offset_x_mm','offset_y_mm']) delete n[k];
+  return n; });
+const saveCfg = () => store.set('cfg', cfg);
+const saveLog = () => { if (log.length > 3000) log = log.slice(-3000);
+  if (!store.set('log', log)) msg('Phone storage is full: this reading is shown but was not saved. Export, then delete old scans or readings.','err'); };
+
+// ---------- UI helpers ----------
+function msg(t, cls=''){ const m=$('msg'); m.textContent=t; m.className='msg '+cls; }
+function status(){
+  const dot=$('dot');
+  if (!S.connected){ dot.className='dot'+(S.wantConnected?' warn':''); $('stTitle').textContent = S.wantConnected?'Reconnecting…':'Not connected';
+    $('stSub').textContent = S.wantConnected?'Keep the meter on with Bluetooth enabled.':'Switch the meter\'s Bluetooth on, then connect.';
+    $('btnConnect').textContent='Connect'; $('btnMeasure').disabled=true; scanButtons(); return; }
+  const quiet = Date.now()-S.lastBeat > 5000;
+  dot.className = 'dot ' + (quiet?'warn':'on');
+  $('stTitle').textContent = quiet ? 'Connected, no signal' : 'Connected';
+  const mode = S.mode!=null ? (GLM.MODES[S.mode]||('mode '+S.mode)) : 'mode not reported yet';
+  $('stSub').textContent = (SC.on ? 'Scanning · ' : '') + mode + ', laser ' + (S.laser?'on':'off');
+  $('btnConnect').textContent='Disconnect'; $('btnMeasure').disabled = S.busy || S.saving;
+  scanButtons();
+}
+function scanButtons(){
+  const b=$('btnScan'), s=$('btnScanStop'); if(!b) return;
+  b.disabled = !S.connected || SC.on || S.busy || S.saving;
+  s.disabled = !SC.on;
+}
+setInterval(()=>{ if(S.connected) status(); }, 1000);
+const hex = a => Array.from(a, b=>b.toString(16).padStart(2,'0')).join(' ').toUpperCase();
+
+// ---------- Bluetooth ----------
+let wq = Promise.resolve();
+function send(bytes){
+  wq = wq.then(async ()=>{ if(!S.ch) throw new Error('not connected'); const h=hex(bytes); flog('out', h);
+    if (S.ch.writeValueWithResponse) await S.ch.writeValueWithResponse(bytes); else await S.ch.writeValue(bytes); flog('ack', h); });
+  return wq.catch(e=>{ msg('Send failed: '+e.message,'err'); throw e; });
+}
+async function connect(){
+  if (!navigator.bluetooth){ msg('Bluetooth is not available in this browser. Use Chrome on Android, on an https page.','err'); return; }
+  try{
+    S.dev = await navigator.bluetooth.requestDevice({ acceptAllDevices:true, optionalServices:[GLM.SERVICE] });
+  }catch(e){ if(e.name!=='NotFoundError') msg(e.message,'err'); return; }
+  S.wantConnected = true;
+  S.dev.addEventListener('gattserverdisconnected', onDisconnect);
+  await openGatt();
+}
+async function openGatt(){
+  try{
+    msg('Connecting…');
+    const server = await S.dev.gatt.connect();
+    const svc = await server.getPrimaryService(GLM.SERVICE);
+    S.ch = await svc.getCharacteristic(GLM.CHAR);
+    S.ch.addEventListener('characteristicvaluechanged', onData);
+    await S.ch.startNotifications();
+    S.connected = true; S.lastBeat = Date.now(); wq = Promise.resolve();
+    flog('event', '', 'connected');
+    await send(GLM.CMD_SYNC_ON);
+    msg('Connected to '+(S.dev.name||'meter')+'.','ok'); status();
+    requestWake();
+  }catch(e){
+    S.connected=false; status();
+    msg('Could not connect: '+e.message+(e.name==='NotFoundError'?' (wrong device picked?)':''),'err');
+    if (S.wantConnected) setTimeout(()=>{ if(S.wantConnected && !S.connected) openGatt(); }, 3000);
+  }
+}
+function onDisconnect(){
+  S.connected=false; S.ch=null; S.laser=false; status();
+  if (S.pending){ S.pending.reject(new Error('Meter disconnected')); }
+  flog('event', '', 'disconnected');
+  if (SC.pending){ SC.pending({st:'disconnected'}); }
+  SC.hb = [];                                     // heartbeat phase restarts after a reconnect
+  if (S.wantConnected){ msg('Connection lost. Retrying…','warn'); setTimeout(()=>{ if(S.wantConnected && !S.connected) openGatt(); }, 1000); }
+}
+function disconnect(){ S.wantConnected=false; try{ S.dev && S.dev.gatt.disconnect(); }catch(e){} S.connected=false; status(); msg('Disconnected.'); }
+$('btnConnect').onclick = () => S.connected || S.wantConnected ? disconnect() : connect();
+
+function onData(ev){
+  const b = new Uint8Array(ev.target.value.buffer.slice(ev.target.value.byteOffset, ev.target.value.byteOffset+ev.target.value.byteLength));
+  const frames = parser.feed(b);
+  S.lastBeat = Date.now();                       // any frame shows the link is alive
+  const beatOnly = frames.length>0 && frames.every(f=>f.kind==='heartbeat');
+  if ((SC.on && SC.cur && SC.cur.frames) || (!SC.on && cfg.frames && !beatOnly)) flog('in', hex(b), frames.map(f=>f.kind==='sync' ? 'sync '+(GLM.TYPES[f.type]||f.type) : f.kind==='reply' ? 'reply len '+f.payload.length+' st '+f.status : f.kind).join('+'));
+  for (const f of frames){
+    if (f.kind==='heartbeat'){ S.lastBeat=Date.now(); SC.hb.push(performance.now()); if (SC.hb.length>16) SC.hb.shift(); continue; }
+    if (f.kind==='reply' && SC.on && !SC.pending && f.payload.length===4){ if (SC.cur) SC.cur.stale=(SC.cur.stale||0)+1; flog('event','','late reply ignored'); continue; }
+    if (f.kind==='reply' && SC.pending && performance.now()-SC.sentAt < 280){   // too soon (real replies take >=327 ms) to be a new measurement: a late reply to an earlier command
+      if (SC.cur) SC.cur.stale=(SC.cur.stale||0)+1; flog('event','','stale reply ignored'); continue;
+    }
+    if (f.kind==='reply' && SC.pending){                        // scan: reply to direct measure (C0 40)
+      if (f.status===0 && f.payload.length===4){
+        const p=f.payload, v=(p[0]|(p[1]<<8)|(p[2]<<16)|(p[3]<<24))>>>0;
+        SC.pending({st:'ok', raw:v}); continue;
+      }
+      if (f.status!==0){ SC.pending({st:'status '+f.status}); continue; }
+    }
+    if (f.kind==='reply' && f.payload.length===16){ S.laser = f.payload[1]===1; status(); continue; }
+    if (f.kind!=='sync') continue;
+    S.lastBeat = Date.now();
+    if (f.type===0x00){ S.laser=f.laser; if(S.pending && f.laser) S.pending.laserOn(); }
+    else if (f.type===0xF0){ S.mode=f.mode; if (SC.cur) SC.cur.mode_changes=(SC.cur.mode_changes||0)+1; }
+    else if (f.type===0xFC){
+      if (SC.on){ if (SC.cur) SC.cur.meter_errors=(SC.cur.meter_errors||0)+1; if (SC.pending) SC.pending({st:'meter error'}); }
+      else { msg('The meter reported an error. Press Measure again, or clear the error on the meter.','warn'); if(S.pending) S.pending.reject(new Error('meter error')); }
+    }
+    else if (f.measurement && SC.on){ if (SC.cur) SC.cur.sync_ignored=(SC.cur.sync_ignored||0)+1; }   // button reading during a scan: counted, not logged
+    else if (f.measurement){ S.laser=false; const m={0x04:1,0x08:2,0x28:10,0x2C:11,0x21:8,0x58:8}[f.type]; if(m) S.mode=m; onMeasurement(f); }
+    status();
+  }
+}
+
+// ---------- measuring ----------
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+async function measure(opts={}){
+  if ((S.busy && !opts.force) || !S.connected) return;
+  S.busy=true; status(); msg('Measuring…');
+  const t0 = performance.now();
+  let laserResolve;
+  const laserSeen = new Promise(r=>laserResolve=r);
+  const got = new Promise((resolve,reject)=>{ S.pending={resolve,reject,laserOn:()=>laserResolve(),t0}; });
+  got.catch(()=>{});
+  const timeout = (ms,label) => new Promise((_,rej)=>setTimeout(()=>rej(new Error(label)),ms));
+  try{
+    if (S.mode===8){
+      // Angle / level mode: the meter's button alternates hold (sends the reading) and release (sends nothing).
+      // Press once; if no reading within 0.4 s the meter was holding, so press again.
+      await send(GLM.CMD_BUTTON);
+      const first = await Promise.race([got.then(()=>'reading'), sleep(400).then(()=>'none')]);
+      if (first==='reading') return;
+      await send(GLM.CMD_BUTTON);
+      await Promise.race([got, timeout(1500,'No reading received. Check the meter screen.')]);
+      return;
+    }
+    if (!S.laser){
+      await send(GLM.CMD_BUTTON);                 // first press: laser on
+      const first = await Promise.race([laserSeen.then(()=>'laser'), got.then(()=>'reading'), sleep(1500).then(()=>'none')]);
+      if (first==='reading'){ await got; return; }
+      await sleep(350);
+    }
+    await send(GLM.CMD_BUTTON);                   // second press: measure
+    await Promise.race([got, timeout(4000,'No reading received. Check the meter screen.')]);
+  }catch(e){ msg(e.message,'err'); }
+  finally{ S.pending=null; S.busy=false; status(); }
+}
+$('btnMeasure').onclick = () => appCam() ? startAppShot() : measure();
+
+// ---------- camera-app flow: laser on -> camera app -> photo back -> measure ----------
+function startAppShot(){
+  if (S.busy || !S.connected) return;
+  S.busy=true; S.appShot={t0:performance.now(), done:false}; status();
+  const fi=$('fileIn'); fi.value='';
+  fi.click();                                        // must run inside the tap
+  msg('Take the photo with the laser dot on target, then confirm.');
+  if (!S.laser && S.mode!==8) send(GLM.CMD_BUTTON).catch(()=>{});   // laser on, dot visible in the photo
+}
+function endAppShot(text, cls='warn'){ S.appShot=null; S.appPhoto=null; S.busy=false; status(); if(text) msg(text, cls); }
+$('fileIn').addEventListener('change', async ()=>{
+  if (!S.appShot) return;
+  const file=$('fileIn').files[0];
+  if (!file){ endAppShot('No photo taken. No reading recorded.'); return; }
+  S.appShot.done=true;
+  msg('Photo received. Measuring…');
+  const t=performance.now();
+  while (!S.connected && performance.now()-t<10000) await sleep(200);
+  if (!S.connected){ endAppShot('Meter not connected, so the photo was not saved. Reconnect and try again.','err'); return; }
+  S.appPhoto={file, returnedAt:Date.now()};
+  await measure({force:true});
+  if (S.appPhoto) msg('No reading received, so the photo was not saved. Check the meter and try again.','err');
+  endAppShot(null);
+});
+$('fileIn').addEventListener('cancel', ()=>endAppShot('Photo cancelled. No reading recorded.'));
+
+function fmt(v, d=4){ return v==null||!isFinite(v) ? '' : v.toFixed(d); }
+function stamp(d){ const p=n=>String(n).padStart(2,'0');
+  return { exif:`${d.getFullYear()}:${p(d.getMonth()+1)}:${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`,
+    file:`${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`,
+    sub:String(d.getMilliseconds()).padStart(3,'0') }; }
+
+async function onMeasurement(f){
+  const now = new Date(), tRecv = performance.now();
+  const pend = S.pending;
+  const off = {z:+cfg.z||0};
+  const dOff = f.distance!=null ? f.distance + off.z/1000 : null;
+  const th = f.angle!=null ? f.angle*Math.PI/180 : null;
+  const rec = {
+    time: now.toISOString(), local: now.toLocaleString(), app_version: VERSION, source: pend ? 'app' : 'meter button',
+    counter: f.counter, type: GLM.TYPES[f.type]||('0x'+f.type.toString(16)), mode: S.mode,
+    distance_m: dOff, angle_deg: f.angle ?? null,
+    vertical_m: (dOff!=null && th!=null) ? dOff*Math.sin(th) : null,
+    horizontal_m: (dOff!=null && th!=null) ? dOff*Math.cos(th) : null,
+    distance_no_offset_m: f.distance ?? null, offset_z_mm: off.z, meter_height_m: f.height ?? null,
+    other_value: f.other ?? null, angle2_deg: f.angle2 ?? null, min_m: f.min ?? null, max_m: f.max ?? null,
+    trigger_to_reading_ms: pend ? Math.round(tRecv - pend.t0) : null,
+    camera_pitch_deg: camAngles().pitch, camera_roll_deg: camAngles().roll,
+    phone_beta_deg: S.pitch, phone_gamma_deg: S.roll,
+    lat: S.gps?.lat ?? null, lon: S.gps?.lon ?? null, alt: S.gps?.alt ?? null, gps_acc_m: S.gps?.acc ?? null,
+    file: null, reading_to_photo_ms: null
+  };
+  showReading(rec);
+  if (pend) pend.resolve();
+  const wantPhoto = browserCam() && S.stream && !S.saving && (rec.source==='app' || cfg.devPhoto);
+  if (browserCam() && S.saving) msg('Reading logged without a photo: the previous photo was still saving.','warn');
+  if (S.appPhoto && pend){
+    const ap=S.appPhoto; S.appPhoto=null;
+    try{
+      S.saving=true; status(); msg('Saving photo…');
+      const jpg=new Uint8Array(await ap.file.arrayBuffer());
+      const sz=GLM.jpegSize(jpg), st=stamp(now);
+      rec.photo_source='camera app'; rec.photo_width=sz?sz.w:null; rec.photo_height=sz?sz.h:null;
+      rec.photo_time=new Date(ap.file.lastModified).toISOString();
+      rec.photo_to_reading_ms=now.getTime()-ap.file.lastModified;
+      setLastPhoto(rec.photo_width, rec.photo_height, 'camera app', null);
+      rec.file=`${cfg.prefix||'MeasureUp'}_${String(f.counter).padStart(4,'0')}_${st.file}.jpg`;
+      const meta=Object.assign({app:'Measure Up '+VERSION}, rec);
+      const desc=describe(rec, off);
+      const props={}; for (const k of XMP_FIELDS) if (rec[k]!=null) props[k]=roundField(k, rec[k]);
+      const out=GLM.writeXmp(jpg, {title:desc, description:desc, props, json:JSON.stringify(meta)});
+      download(new Blob([out],{type:'image/jpeg'}), rec.file);
+      msg(`Saved ${rec.file} (${rec.photo_width}×${rec.photo_height}, camera app).`,'ok');
+    }catch(e){ msg('Reading logged, but saving the photo failed: '+e.message,'err'); }
+    finally{ S.saving=false; status(); }
+  } else if (appCam() && !pend) msg('Reading logged without a photo. In camera-app mode, use the Measure button to get a photo.','warn');
+  else if (wantPhoto){
+    try{
+      S.saving=true; status(); msg('Saving photo…');
+      const blob = await takePhoto();
+      rec.reading_to_photo_ms = Math.round(performance.now() - tRecv);
+      rec.cam_mode = S.camMode; rec.cam_fps = S.camFps;
+      const st = stamp(now);
+      rec.file = `${cfg.prefix||'MeasureUp'}_${String(f.counter).padStart(4,'0')}_${st.file}.jpg`;
+      const jpg = new Uint8Array(await blob.arrayBuffer());
+      const sz = GLM.jpegSize(jpg); rec.photo_source = S.photoSource; rec.photo_error = S.photoError; rec.photo_width = sz?sz.w:null; rec.photo_height = sz?sz.h:null;
+      const meta = Object.assign({app:'Measure Up '+VERSION}, rec);
+      const desc = describe(rec, off);
+      const out = GLM.writeExif(jpg, { description: desc, xpTitle: desc, xpComment: desc, datetime: st.exif, subsec: st.sub,
+        orientation: GLM.readOrientation(jpg), userComment: JSON.stringify(meta),
+        gps: (cfg.gps && S.gps) ? {lat:S.gps.lat, lon:S.gps.lon, alt:S.gps.alt} : null });
+      download(new Blob([out],{type:'image/jpeg'}), rec.file);
+      flash();
+      rec.photo_saved_ms = Math.round(performance.now() - tRecv);
+      setLastPhoto(rec.photo_width, rec.photo_height, rec.photo_source, rec.reading_to_photo_ms);
+      msg(`Saved ${rec.file} (${rec.photo_width}×${rec.photo_height}, ${(rec.reading_to_photo_ms/1000).toFixed(1)} s)` + (rec.photo_error?`. Full-size problem: ${rec.photo_error}`:''), rec.photo_source==='preview'?'warn':'ok');
+    }catch(e){ msg('Reading logged, but the photo failed: '+e.message,'err'); }
+    finally{ S.saving=false; status(); }
+  } else if (pend) msg('Reading logged.','ok');
+  log.push(rec); saveLog(); renderLog();
+}
+
+const XMP_FIELDS=['counter','type','mode','source','distance_m','angle_deg','vertical_m','horizontal_m','distance_no_offset_m','offset_z_mm','meter_height_m','time','photo_time','photo_to_reading_ms','camera_pitch_deg','camera_roll_deg','lat','lon','app_version'];
+function roundField(k,v){ return typeof v!=='number' ? v : /_m$/.test(k) ? +v.toFixed(5) : /_deg$/.test(k) ? +v.toFixed(3) : v; }
+function describe(rec, off){
+  const b=[];
+  if (rec.distance_m!=null) b.push(`distance ${fmt(rec.distance_m)} m (Z offset ${off.z} mm)`);
+  if (rec.angle_deg!=null) b.push(`angle ${fmt(rec.angle_deg,2)} deg`);
+  if (rec.vertical_m!=null) b.push(`vertical ${fmt(rec.vertical_m)} m, horizontal ${fmt(rec.horizontal_m)} m`);
+  if (rec.distance_no_offset_m!=null && off.z) b.push(`no offset ${fmt(rec.distance_no_offset_m)} m`);
+  return `Measure Up #${rec.counter} ${rec.type}: ` + b.join(', ');
+}
+function showReading(r){
+  const d = r.distance_m;
+  $('rDist').innerHTML = (d!=null? d.toFixed(3) : '–') + '<small>m</small>';
+  $('rAng').textContent = r.angle_deg!=null ? r.angle_deg.toFixed(2)+'°' : '–';
+  const bits = [`#${r.counter}`, r.type];
+  if (r.vertical_m!=null) bits.push(`vertical ${r.vertical_m.toFixed(3)} m`, `horizontal ${r.horizontal_m.toFixed(3)} m`);
+  if (r.distance_no_offset_m!=null && r.offset_z_mm) bits.push(`no offset ${r.distance_no_offset_m.toFixed(4)} m`);
+  if (r.angle2_deg!=null) bits.push(`2nd axis ${r.angle2_deg.toFixed(2)}°`);
+  $('rSub').textContent = bits.join(',  ');
+}
+function renderLog(){
+  const ul=$('log'); ul.innerHTML='';
+  $('logTitle').textContent = log.length ? `Readings (${log.length})` : 'Readings';
+  if (!log.length){ const li=document.createElement('li'); li.textContent='Readings appear here. They stay saved on this phone until you clear them.'; ul.appendChild(li); return; }
+  for (const r of log.slice(-50).reverse()){
+    const li=document.createElement('li');
+    const main=document.createElement('div');
+    main.textContent = `#${r.counter}  ${r.type}  ` + (r.distance_m!=null?`${r.distance_m.toFixed(4)} m  `:'') + (r.angle_deg!=null?`${r.angle_deg.toFixed(2)}°`:'')
+      + (r.offset_z_mm && r.distance_no_offset_m!=null ? `   (no offset ${r.distance_no_offset_m.toFixed(4)} m)` : '');
+    const t=document.createElement('div'); t.className='t';
+    t.textContent = `${r.local}, ${r.source}` + (r.file?`, ${r.file}`:'');
+    li.append(main,t); ul.appendChild(li);
+  }
+}
+
+// ---------- camera ----------
+// In-browser photos: the stream runs at up to 4000×3000 ("live"), so a photo is just the current frame (fast).
+// If the phone can't keep the preview smooth at that size (<8 fps), the preview drops to 1920 and each photo
+// switches the stream up for one frame ("switch"). Chrome's still-photo API is not used: on the Motorola it never answers.
+const PHOTO_C={width:{ideal:4000},height:{ideal:3000}}, PREVIEW_C={width:{ideal:1920},height:{ideal:1440}};
+const camForce=new URLSearchParams(location.search).get('cam');   // ?cam=live or ?cam=switch: force a mode (A/B timing tests)
+const limit=(p,ms)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timed out after '+ms/1000+' s')),ms))]);
+const errTxt=e=>((e&&e.name&&e.name!=='Error')?e.name+': ':'')+(e&&e.message||e);
+S.fc=0; S.rvfc=false; S.camMode=null; S.camFps=null; S.reverting=null;
+async function startCamera(quiet){
+  try{
+    const forceSwitch = camForce==='switch';
+    S.stream = await navigator.mediaDevices.getUserMedia({ video:Object.assign({facingMode:{ideal:'environment'}}, forceSwitch?PREVIEW_C:PHOTO_C), audio:false });
+    const v=$('video'); v.srcObject=S.stream; await v.play(); S.lastFrame=performance.now(); watchFrames();
+    $('camEmpty').hidden=true; $('cross').hidden=false;
+    const track=S.stream.getVideoTracks()[0];
+    S.camMode = forceSwitch ? 'switch' : 'live';
+    if (!forceSwitch){
+      S.camFps = await measureFps(1000);
+      if (camForce!=='live' && S.camFps!=null && S.camFps<8){ S.camMode='switch'; await limit(track.applyConstraints(PREVIEW_C),3000).catch(()=>{}); }
+    }
+    if (SC.on) camLow(true);
+    if (!quiet) msg(S.camMode==='live' ? `Camera ready. Photos ${v.videoWidth}×${v.videoHeight}.` : 'Camera ready.', 'ok');
+  }catch(e){ cfg.photo=false; $('optPhoto').checked=false; saveCfg(); applyCamMode(); msg('Camera unavailable: '+e.message,'err'); }
+}
+async function measureFps(ms){
+  if (!S.rvfc) return null;
+  await sleep(300);                                   // skip start-up frames
+  const f0=S.fc, t0=performance.now(); await sleep(ms);
+  return Math.round((S.fc-f0)*1000/(performance.now()-t0)*10)/10;
+}
+function watchFrames(){
+  const v=$('video');
+  if ('requestVideoFrameCallback' in v){ S.rvfc=true; const cb=()=>{ S.lastFrame=performance.now(); S.fc++; if(S.stream) v.requestVideoFrameCallback(cb); }; v.requestVideoFrameCallback(cb); }
+  else { let t=-1; const poll=()=>{ if(!S.stream) return; if(v.currentTime!==t){ t=v.currentTime; S.lastFrame=performance.now(); } setTimeout(poll,250); }; poll(); }
+}
+async function restartCamera(){ if(S.restarting) return; S.restarting=true; stopCamera(); await sleep(300); await startCamera(true); S.restarting=false; }
+setInterval(()=>{
+  if (!browserCam() || !S.stream || S.capturing || S.reverting || S.restarting || document.visibilityState!=='visible') return;
+  const v=$('video'); if (v.paused) v.play().catch(()=>{});
+  if (performance.now()-S.lastFrame > 2500) restartCamera();
+}, 1000);
+function stopCamera(){ if(S.stream) S.stream.getTracks().forEach(t=>t.stop()); S.stream=null; $('camEmpty').hidden=false; $('cross').hidden=true; const v=$('video'); if(v) v.srcObject=null; }
+// During a scan a live 12 MP preview only costs battery and heat: drop it to 1920, restore after.
+function camLow(on){
+  if (S.camMode!=='live' || !S.stream) return;
+  const tr=S.stream.getVideoTracks()[0];
+  S.reverting = limit(tr.applyConstraints(on?PREVIEW_C:PHOTO_C),3000).catch(()=>{}).then(()=>{ S.reverting=null; S.lastFrame=performance.now(); });
+}
+async function takePhoto(){
+  S.capturing=true;
+  try{ return await capture(); } finally { S.capturing=false; S.lastFrame=performance.now(); const v=$('video'); if(v.paused) v.play().catch(()=>{}); }
+}
+async function capture(){
+  S.photoError=null;
+  const v=$('video');
+  if (S.reverting) await S.reverting;
+  if (S.camMode!=='switch' || !S.stream){ S.photoSource = S.stream ? 'live stream' : 'preview'; return frameJpeg(v); }
+  const track=S.stream.getVideoTracks()[0], before=track.getSettings(), area0=(before.width||0)*(before.height||0);
+  let blob=null;
+  try{
+    await limit(track.applyConstraints(PHOTO_C),3000);
+    const t0=performance.now();
+    while (performance.now()-t0<2500 && v.videoWidth*v.videoHeight<=area0) await sleep(30);
+    if (v.videoWidth*v.videoHeight > area0){ await new Promise(r=>requestAnimationFrame(()=>r())); blob=await frameJpeg(v); S.photoSource='switched stream'; }
+    else S.photoError='stream stayed at '+v.videoWidth+'×'+v.videoHeight;
+  }catch(e){ S.photoError='max stream: '+errTxt(e); }
+  finally{ S.reverting = limit(track.applyConstraints(PREVIEW_C),3000).catch(()=>{}).then(()=>{ S.reverting=null; S.lastFrame=performance.now(); }); }
+  if (blob) return blob;
+  S.photoSource='preview';
+  return frameJpeg(v);
+}
+function frameJpeg(v){
+  const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0); markCanvas(c);
+  return new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('capture failed')),'image/jpeg',0.92));
+}
+// Small "MeasureUp" mark, bottom right, away from the crosshair. Always on in-browser photos; camera-app photos are left untouched.
+function markCanvas(c){
+  const g=c.getContext('2d'), h=Math.max(14, Math.round(Math.min(c.width,c.height)*0.03));
+  const fam='"Atkinson Hyperlegible",system-ui,sans-serif', pad=Math.round(h*0.7);
+  g.save(); g.textBaseline='alphabetic'; g.shadowColor='rgba(0,0,0,.6)'; g.shadowBlur=Math.round(h*0.25);
+  g.font=`700 ${h}px ${fam}`; const wUp=g.measureText('Up').width;
+  g.font=`400 ${h}px ${fam}`; const wMe=g.measureText('Measure').width;
+  const x=c.width-pad-wMe-wUp, y=c.height-pad;
+  g.globalAlpha=0.7; g.fillStyle='#E6EFE9'; g.fillText('Measure', x, y);
+  g.font=`700 ${h}px ${fam}`; g.fillStyle='#2BD65C'; g.fillText('Up', x+wMe, y);
+  g.restore();
+}
+function showLastPhoto(){
+  const lp=store.get('lastPhoto', null), el=$('lastPhoto');
+  el.textContent = lp ? `Last photo: ${lp.w}×${lp.h}, ${lp.src}` + (lp.ms!=null ? `, ready ${(lp.ms/1000).toFixed(1)} s after the reading` : '') : '';
+}
+function setLastPhoto(w,h,src,ms){ store.set('lastPhoto',{w,h,src,ms}); showLastPhoto(); }
+function flash(){ const f=$('flash'); f.classList.add('go'); requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.remove('go'))); }
+function download(blob, name){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 10000);
+}
+
+// ---------- sensors ----------
+window.addEventListener('deviceorientation', e=>{ if(e.beta!=null){ S.pitch=+e.beta.toFixed(2); S.roll=+e.gamma.toFixed(2); } });
+// Camera axis from gravity: pitch = elevation of the rear-camera axis, roll = rotation about it (0 = portrait upright).
+S.grav=null;
+window.addEventListener('devicemotion', e=>{ const a=e.accelerationIncludingGravity; if(!a||a.x==null) return;
+  const k=0.15; S.grav = S.grav ? {x:S.grav.x+k*(a.x-S.grav.x), y:S.grav.y+k*(a.y-S.grav.y), z:S.grav.z+k*(a.z-S.grav.z)} : {x:a.x,y:a.y,z:a.z}; });
+function camAngles(){ const g=S.grav; if(!g) return {pitch:null, roll:null};
+  const n=Math.hypot(g.x,g.y,g.z); if(n<5) return {pitch:null, roll:null};
+  return { pitch:+(-Math.asin(Math.max(-1,Math.min(1,g.z/n)))*180/Math.PI).toFixed(2), roll:+(Math.atan2(g.x,g.y)*180/Math.PI).toFixed(1) }; }
+function gpsOn(on){
+  if (S.gpsWatch!=null){ navigator.geolocation.clearWatch(S.gpsWatch); S.gpsWatch=null; }
+  if (on && navigator.geolocation) S.gpsWatch = navigator.geolocation.watchPosition(
+    p=>{ S.gps={lat:p.coords.latitude, lon:p.coords.longitude, alt:p.coords.altitude, acc:p.coords.accuracy}; },
+    e=>msg('GPS: '+e.message,'warn'), {enableHighAccuracy:true, maximumAge:5000});
+  else S.gps=null;
+}
+async function requestWake(){ try{ if('wakeLock' in navigator) S.wake = await navigator.wakeLock.request('screen'); }catch(e){} }
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState!=='visible') return; if(S.connected) requestWake(); if(browserCam()) restartCamera();
+  if (S.appShot && !S.appShot.done) setTimeout(()=>{ if(S.appShot && !S.appShot.done) endAppShot('No photo received. No reading recorded.'); }, 3000); });
+
+// ---------- scan (slider): repeated direct measure C0 40 00 EE ----------
+// Rows are stored compactly: [i, t_send_ms, t_reply_ms, raw (0.05 mm units), status]
+cfg.scan = Object.assign({label:'', speed:null, interval:0, maxMin:10, autoSave:true, avoidHb:true, frames:true}, cfg.scan||{});
+let scans = store.get('scans', []);
+scans.forEach(s=>{ if (!s.stopReason) s.stopReason='interrupted (page closed)'; });
+const SCAN_MAX_ROWS = 20000, SCAN_MAX_COUNT = 20;
+function saveScans(){
+  let total = scans.reduce((s,x)=>s+x.rows.length, 0);
+  while (scans.length>1 && scans[0]!==SC.cur && (scans.length>SCAN_MAX_COUNT || total>SCAN_MAX_ROWS)){ total-=scans[0].rows.length; scans.shift(); }
+  scans.slice(0,-3).forEach(x=>{ if (x.frames){ delete x.frames; x.framesDropped=true; } });   // frame logs: last 3 scans only
+  try{ localStorage.setItem('glm.scans', JSON.stringify(scans)); return true; }
+  catch(e){ msg('Phone storage is full: export and delete old scans.','warn'); return false; }
+}
+function scanStats(sc){
+  const ok = sc.rows.filter(r=>r[4]==='ok');
+  const n = sc.rows.length, fail = sc.rows.filter(r=>r[4]!=='ok' && r[4]!=='reconnected').length;
+  const dur = n ? ((sc.rows[n-1][2] ?? sc.rows[n-1][1]) - sc.rows[0][1])/1000 : 0;
+  const rep = ok.map(r=>r[2]-r[1]);
+  const gaps = []; for (let i=1;i<ok.length;i++) gaps.push(ok[i][2]-ok[i-1][2]);
+  const mean = a => a.length ? a.reduce((s,x)=>s+x,0)/a.length : null;
+  const sd = a => { const m=mean(a); return a.length>1 ? Math.sqrt(a.reduce((s,x)=>s+(x-m)*(x-m),0)/(a.length-1)) : null; };
+  return { n, ok:ok.length, fail, dur, rate: dur>0 ? ok.length/dur : 0,
+    replyMean: mean(rep), replyMax: rep.length?Math.max(...rep):null, gapMean: mean(gaps), gapSd: sd(gaps) };
+}
+function scanLine(sc){
+  const s=scanStats(sc);
+  return `${sc.label?sc.label+'  ':''}${s.ok} readings, ${s.rate.toFixed(2)} Hz, ${s.fail} failed, ${s.dur.toFixed(0)} s`
+    + (s.replyMean!=null ? `, reply ${s.replyMean.toFixed(0)} ms (max ${s.replyMax})` : '')
+    + (s.gapSd!=null ? `, gap ${s.gapMean.toFixed(0)}±${s.gapSd.toFixed(0)} ms` : '');
+}
+function renderScans(){
+  const ul=$('scanList'); ul.innerHTML='';
+  $('scanTitle').textContent = SC.on ? 'Scan (slider): running' : scans.length ? `Scan (slider): ${scans.length} saved` : 'Scan (slider)';
+  for (const sc of scans.slice().reverse()){
+    const li=document.createElement('li'); li.className='scanitem';
+    const a=document.createElement('div'); a.textContent=scanLine(sc);
+    const t=document.createElement('div'); t.className='t';
+    const extra=[]; if(sc.meter_errors) extra.push(`${sc.meter_errors} meter errors`); if(sc.sync_ignored) extra.push(`${sc.sync_ignored} button readings ignored`);
+    if(sc.hidden) extra.push('page left during scan');
+    if(sc.reconnects) extra.push(`${sc.reconnects} reconnects`); if(sc.stale) extra.push(`${sc.stale} late replies ignored`);
+    if(sc.speed) extra.push(`${sc.speed} mm/s`);
+    t.textContent=`${sc.local}, ${sc.stopReason||'running'}` + (extra.length?', '+extra.join(', '):'');
+    li.append(a,t);
+    const acts=document.createElement('div'); acts.className='acts';
+    const mk=(txt,fn)=>{ const b=document.createElement('button'); b.className='btn sm'; b.textContent=txt; b.onclick=fn; acts.appendChild(b); return b; };
+    mk('View', ()=>openView(sc));
+    if (sc!==SC.cur){
+      mk('Export', ()=>exportScans([sc]));
+      mk('Delete', ()=>{ if (confirm('Delete this scan from the phone?')){ scans=scans.filter(x=>x!==sc); if (SV.sc===sc) closeView(); saveScans(); renderScans(); } });
+    }
+    li.appendChild(acts);
+    ul.appendChild(li);
+  }
+}
+function hbPeriod(){
+  const iv=[]; for (let k=1;k<SC.hb.length;k++){ const d=SC.hb[k]-SC.hb[k-1]; if (d>800 && d<3000) iv.push(d); }
+  if (iv.length<3) return null;
+  iv.sort((a,b)=>a-b); return iv[Math.floor(iv.length/2)];
+}
+function median(a){ if(!a.length) return null; const b=a.slice().sort((x,y)=>x-y); return b[Math.floor(b.length/2)]; }
+// ms to wait so that no heartbeat is expected between sending and the reply (+margins)
+function hbWait(now, R){
+  const P=hbPeriod(); if (!P || !SC.hb.length) return 0;
+  let next=SC.hb[SC.hb.length-1]+P; while (next < now-30) next+=P;
+  return (next <= now+R+80) ? Math.min(P, next+60-now) : 0;
+}
+function showScan(rawVal){
+  const sc=SC.cur, d=rawVal*0.00005 + (sc.z||0)/1000;
+  $('rDist').innerHTML = d.toFixed(4)+'<small>m</small>';
+  $('rAng').textContent='–';
+  const P=hbPeriod();
+  $('rSub').textContent='Scan: '+scanLine(sc) + (P ? `, heartbeat ${(P/1000).toFixed(2)} s` : '');
+}
+async function startScan(){
+  if (!S.connected || SC.on || S.busy || S.saving) return;
+  if (S.laser){ msg('The laser is on from a Measure press. Take that reading or wait about 20 s for auto-off, then start the scan.','warn'); return; }
+  const c=cfg.scan, now=new Date();
+  const cur={ id:stamp(now).file, label:c.label||'', start:now.toISOString(), local:now.toLocaleString(),
+    speed: c.speed>0 ? c.speed : null, interval:c.interval||0, maxMin:c.maxMin||10, z:+cfg.z||0, version:VERSION, mode:S.mode,
+    avoidHb: !!c.avoidHb, rows:[], frames: cfg.frames ? [] : null, stopReason:null, reconnects:0 };
+  camLow(true);
+  scans.push(cur); SC.cur=cur; SC.on=true; SC.stopReq=false; S.busy=true; status(); renderScans();
+  if ($('scanBox').open) openView(cur);          // live profile while scanning
+  msg(S.mode!=null && S.mode!==1 ? 'Scanning. Note: the meter is not in single distance mode (untested for scans).' : 'Scanning…', S.mode!=null && S.mode!==1 ? 'warn' : '');
+  const t0=performance.now(); SC.t0=t0; let fails=0, i=0, lastSave=0, lastUi=0; const reps=[];
+  flog('event','', 'scan start, heartbeat period '+(hbPeriod()??'unknown')+' ms, avoid heartbeat '+(cur.avoidHb?'on':'off'));
+  const row=(ts,tr,rv,st,wait,since)=>cur.rows.push([i++, Math.round(ts-t0), tr==null?null:Math.round(tr-t0), rv, st, wait, since, hbPeriod(), document.visibilityState==='visible'?0:1]);
+  try{
+    while (!SC.stopReq){
+      if (performance.now()-t0 > cur.maxMin*60000){ cur.stopReason='time limit'; break; }
+      if (!S.connected){                                   // link dropped: wait for the app's auto-reconnect, then carry on
+        const tl=performance.now();
+        while (!S.connected && S.wantConnected && !SC.stopReq && performance.now()-tl<20000) await sleep(200);
+        if (!S.connected){ cur.stopReason = SC.stopReq ? 'stopped' : !S.wantConnected ? 'disconnected by user' : 'disconnected (no reconnect within 20 s)'; break; }
+        await sleep(500);
+        cur.reconnects++; row(performance.now(), null, null, 'reconnected', null, null); fails=0; continue;
+      }
+      const R = median(reps.slice(-20)) ?? 360;
+      let wait=0;
+      if (cur.avoidHb){ wait=Math.round(hbWait(performance.now(), R)); if (wait>0){ flog('event','', 'hold '+wait+' ms for heartbeat'); await sleep(wait); } }
+      const ts=performance.now();
+      const since = SC.hb.length ? Math.round(ts-SC.hb[SC.hb.length-1]) : null;
+      const tmo = reps.length>=3 ? Math.min(2500, Math.max(800, 2.2*R)) : 2500;
+      const got=new Promise(res=>{ SC.pending=res; });
+      SC.sentAt=ts;
+      let r;
+      try{ await send(GLM.CMD_DIRECT); r=await Promise.race([got, sleep(tmo).then(()=>({st:'timeout'}))]); }
+      catch(e){ r={st: S.connected ? 'send failed' : 'disconnected'}; }
+      SC.pending=null;
+      const tr=performance.now();
+      if (r.st==='timeout') flog('event','', 'timeout after '+Math.round(tmo)+' ms');
+      row(ts, (r.st==='timeout'||r.st==='send failed'||r.st==='disconnected') ? null : tr, r.raw ?? null, r.st, wait, since);
+      if (r.st==='ok'){ fails=0; reps.push(tr-ts); if (tr-lastUi>200){ lastUi=tr; showScan(r.raw); } }
+      else if (r.st!=='disconnected'){
+        fails++;
+        if (fails>=5){ cur.stopReason='5 failures in a row ('+r.st+')'; break; }
+        await sleep(150);                      // short pause; replies arriving <280 ms after the next send are ignored as late
+      }
+      svTick();
+      if (cur.rows.length-lastSave>=50){ lastSave=cur.rows.length; saveScans(); renderScans(); }
+      if (cur.interval>0){ const w=ts+cur.interval-performance.now(); if (w>0) await sleep(w); }
+    }
+  } finally {
+    if (!cur.stopReason) cur.stopReason = 'stopped';
+    cur.end=new Date().toISOString();
+    flog('event','', 'scan end: '+cur.stopReason);
+    SC.on=false; SC.pending=null; S.busy=false; camLow(false);
+    saveScans(); status(); renderScans();
+    if (SV.sc===cur){ $('svSpeed').disabled=false; svDraw(); }
+    const s=scanStats(cur);
+    $('scanStat').textContent='Last scan: '+scanLine(cur)+' ('+cur.stopReason+')';
+    const saved = (cfg.scan.autoSave && cur.rows.length) ? exportScans([cur], true) : null;
+    msg(`Scan ended (${cur.stopReason}): ${s.ok} readings, ${s.rate.toFixed(2)} Hz, ${s.fail} failed.` + (saved ? ` Saved ${saved}.` : ''), s.ok && !s.fail ? 'ok' : 'warn');
+    SC.cur=null; renderScans();
+  }
+}
+// ---------- scan viewer: profile chart (inline SVG) ----------
+const SV = { sc:null, range:[0,1], lastDraw:0, data:null };
+function svSeries(sc){
+  const z=sc.z||0, speed=sc.speed||null, pts=[];
+  for (const r of sc.rows){ if (r[4]!=='ok' || r[3]==null || r[2]==null) continue;
+    const t=(r[1]+r[2])/2000; pts.push({ i:r[0], t, x: speed ? speed*t : t, d: r[3]*0.05 + z, rep: r[2]-r[1] }); }
+  return { pts, xmm: !!speed };
+}
+function pct(a,p){ const b=a.slice().sort((x,y)=>x-y); return b[Math.min(b.length-1, Math.max(0, Math.round(p*(b.length-1))))]; }
+function svCompute(){
+  const sc=SV.sc; if (!sc) return null;
+  const {pts,xmm}=svSeries(sc), mode=$('svMode').value;
+  if (!pts.length) return {pts, xmm, mode, note:'No readings yet.'};
+  const ds=pts.map(p=>p.d), p97=pct(ds,0.97), flip=!!sc.flip;
+  let note='';
+  if (mode==='dist'){ pts.forEach(p=>p.y=p.d); note = flip ? 'Distance from the meter, drawn for a meter pointing up.' : 'Distance from the meter (axis flipped, so the surface reads the right way up).'; }
+  else {
+    let a=p97, b=0, used='flat';
+    if (mode==='tilt'){
+      const c=pts.filter(p=>p.d>=p97-1.5), span=pts[pts.length-1].x-pts[0].x;
+      if (c.length>=10 && span>0 && (c[c.length-1].x-c[0].x)>=0.3*span){
+        const n=c.length, mx=c.reduce((s,p)=>s+p.x,0)/n, my=c.reduce((s,p)=>s+p.d,0)/n;
+        let sxx=0, sxy=0; for (const p of c){ sxx+=(p.x-mx)*(p.x-mx); sxy+=(p.x-mx)*(p.d-my); }
+        b = sxx>0 ? sxy/sxx : 0; a = my - b*mx; used='tilt';
+      }
+    }
+    pts.forEach(p=>p.y=flip ? p.d-(a+b*p.x) : (a+b*p.x)-p.d);   // upside down: meter pointing up, so farther = higher
+    const base=pts.filter(p=>Math.abs(p.y)<=1.5), sd=base.length>2 ? Math.sqrt(base.reduce((s,p)=>s+p.y*p.y,0)/base.length) : null;
+    note = used==='tilt'
+      ? `Height above a straight base line fitted through the farthest readings (slope ${xmm ? (b*1000).toFixed(2)+' mm/m' : (b).toFixed(3)+' mm/s'}).`
+      : (mode==='tilt' ? 'Not enough spread-out base readings to remove tilt; height measured from the farthest level. ' : 'Height measured from the farthest level (97th percentile distance). ');
+    if (flip) note += ' Upside down: drawn for a meter pointing up.';
+    if (sd!=null) note += ` Scatter about the base ${sd.toFixed(2)} mm (includes the surface's own unevenness).`;
+  }
+  note += xmm ? ` x = ${SV.sc.speed} mm/s × time (constant speed assumed).` : ' No slider speed set, so x is time. Enter the speed above to get mm.';
+  const gaps=[]; for (let k=1;k<pts.length;k++) gaps.push(pts[k].t-pts[k-1].t);
+  const g=gaps.length ? pct(gaps,0.5) : 0.4;
+  pts.forEach((p,k)=>p.brk = k>0 && (p.t-pts[k-1].t) > Math.max(1.5, 4*g));
+  return {pts, xmm, mode, note, flip};
+}
+function niceStep(span,n){ const r=span/n, p=Math.pow(10,Math.floor(Math.log10(r||1))); for (const m of [1,2,5,10]) if (m*p>=r) return m*p; return 10*p; }
+function svDraw(){
+  const D=svCompute(); SV.data=D; if (!D) return;
+  const cssv=v=>getComputedStyle(document.body).getPropertyValue(v).trim();
+  const svg=$('svSvg'), W=Math.max(200, $('svChart').clientWidth);
+  $('svNote').textContent=D.note; $('svTip').textContent='Touch the chart to read values.';
+  $('svTrue').disabled=!D.xmm; if (!D.xmm) $('svTrue').checked=false;
+  if (!D.pts.length){ svg.setAttribute('viewBox',`0 0 ${W} 60`); svg.setAttribute('height',60); svg.innerHTML=''; return; }
+  const x0all=D.pts[0].x, x1all=D.pts[D.pts.length-1].x || x0all+1, span=Math.max(1e-6, x1all-x0all);
+  const xr=[x0all+SV.range[0]*span, x0all+SV.range[1]*span];
+  const vis=D.pts.filter(p=>p.x>=xr[0] && p.x<=xr[1]);
+  const ys=(vis.length?vis:D.pts).map(p=>p.y);
+  let y0=Math.min(...ys), y1=Math.max(...ys); if (y1-y0<2){ const c=(y0+y1)/2; y0=c-1; y1=c+1; }
+  const pad=(y1-y0)*0.06; y0-=pad; y1+=pad;
+  const inv = D.mode==='dist' && !D.flip;
+  const m={l:44,r:8,t:8,b:30}, pw=W-m.l-m.r;
+  const ph = $('svTrue').checked ? Math.max(40, Math.min(1200, pw*(y1-y0)/(xr[1]-xr[0]))) : Math.min(320, Math.max(200, W*0.5));
+  const H=ph+m.t+m.b;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',H);
+  const X=x=>m.l+(x-xr[0])/(xr[1]-xr[0])*pw, Y=y=> inv ? m.t+(y-y0)/(y1-y0)*ph : m.t+(y1-y)/(y1-y0)*ph;
+  const grid=cssv('--grid'), axis=cssv('--line'), ser=cssv('--series-1'), bg=cssv('--bg');
+  let o='';
+  const yst=niceStep(y1-y0, $('svTrue').checked ? 2 : 5);
+  for (let v=Math.ceil(y0/yst)*yst; v<=y1+1e-9; v+=yst){ const yy=Y(v).toFixed(1);
+    o+=`<line x1="${m.l}" x2="${W-m.r}" y1="${yy}" y2="${yy}" stroke="${Math.abs(v)<1e-9&&D.mode!=='dist'?axis:grid}" stroke-width="1"/><text class="tick" x="${m.l-5}" y="${+yy+4}" text-anchor="end">${+v.toFixed(2)}</text>`; }
+  const xst=niceStep(xr[1]-xr[0], W<420?6:9);
+  for (let v=Math.ceil(xr[0]/xst)*xst; v<=xr[1]+1e-9; v+=xst){ const xx=X(v).toFixed(1);
+    o+=`<line x1="${xx}" x2="${xx}" y1="${m.t+ph}" y2="${m.t+ph+4}" stroke="${axis}"/><text class="tick" x="${xx}" y="${m.t+ph+15}" text-anchor="middle">${+v.toFixed(1)}</text>`; }
+  o+=`<text class="alab" x="${m.l+pw/2}" y="${H-2}" text-anchor="middle">${D.xmm?'x along slider (mm)':'time (s)'}</text>`;
+  o+=`<text class="alab" transform="translate(10,${m.t+ph/2}) rotate(-90)" text-anchor="middle">${D.mode==='dist'?'distance (mm)':'height (mm)'}</text>`;
+  let path=''; let first=true;
+  for (const p of D.pts){ if (p.x<xr[0]-span*0.02 || p.x>xr[1]+span*0.02){ first=true; continue; }
+    path += (first||p.brk ? 'M' : 'L') + X(p.x).toFixed(1)+','+Y(p.y).toFixed(1); first=false; }
+  o+=`<clipPath id="svcp"><rect x="${m.l}" y="${m.t-2}" width="${pw}" height="${ph+4}"/></clipPath>`;
+  o+=`<path d="${path}" fill="none" stroke="${ser}" stroke-width="2" stroke-linejoin="round" clip-path="url(#svcp)"/>`;
+  o+=`<line id="svHair" y1="${m.t}" y2="${m.t+ph}" stroke="${axis}" stroke-width="1" visibility="hidden"/>`;
+  o+=`<circle id="svDot" r="4" fill="${ser}" stroke="${bg}" stroke-width="2" visibility="hidden"/>`;
+  o+=`<rect id="svHit" x="${m.l}" y="0" width="${pw}" height="${H}" fill="transparent"/>`;
+  svg.innerHTML=o;
+  const move=e=>{ const r=svg.getBoundingClientRect(), px=(e.clientX-r.left)*(W/r.width), xv=xr[0]+(px-m.l)/pw*(xr[1]-xr[0]);
+    if (!vis.length) return; let best=vis[0]; for (const p of vis) if (Math.abs(p.x-xv)<Math.abs(best.x-xv)) best=p;
+    const hx=X(best.x); $('svHair').setAttribute('x1',hx); $('svHair').setAttribute('x2',hx); $('svHair').setAttribute('visibility','visible');
+    $('svDot').setAttribute('cx',hx); $('svDot').setAttribute('cy',Y(best.y)); $('svDot').setAttribute('visibility','visible');
+    const tip=$('svTip'); tip.textContent='';
+    const b=document.createElement('b'); const isD=D.mode==='dist'; b.textContent=`${best.y.toFixed(isD?2:1)} mm`; tip.append(b, document.createTextNode(isD?' distance':' height'));
+    const d=document.createElement('div');
+    d.textContent=(D.xmm?`x ${best.x.toFixed(1)} mm · `:'')+`t ${best.t.toFixed(1)} s · distance ${best.d.toFixed(2)} mm · reply ${Math.round(best.rep)} ms · #${best.i}`;
+    tip.appendChild(d); };
+  const hit=$('svHit'); hit.addEventListener('pointermove',move); hit.addEventListener('pointerdown',move);
+  hit.addEventListener('pointerleave',()=>{ $('svHair').setAttribute('visibility','hidden'); $('svDot').setAttribute('visibility','hidden'); });
+  SV.lastDraw=performance.now();
+}
+function svRanges(){
+  const box=$('svRanges'); box.textContent='';
+  const opts=[['All',[0,1]],['1st third',[0,0.36]],['2nd',[0.32,0.68]],['3rd',[0.64,1]]];
+  for (const [t,r] of opts){ const b=document.createElement('button'); b.textContent=t;
+    b.setAttribute('aria-pressed', String(SV.range[0]===r[0]&&SV.range[1]===r[1]));
+    b.onclick=()=>{ SV.range=r; svRanges(); svDraw(); }; box.appendChild(b); }
+}
+function openView(sc){
+  SV.sc=sc; SV.range=[0,1];
+  $('sv').hidden=false; $('svTitle').textContent=`${sc.label?sc.label+' · ':''}${sc.local}`;
+  $('svSpeed').value = sc.speed ?? ''; $('svFlip').checked = !!sc.flip;
+  $('svSpeed').disabled = SC.on && sc===SC.cur;
+  svRanges(); svDraw();
+  $('sv').scrollIntoView({block:'nearest'});
+}
+function closeView(){ SV.sc=null; $('sv').hidden=true; }
+function svTick(){ if (SV.sc && SV.sc===SC.cur && !$('sv').hidden && performance.now()-SV.lastDraw>1000) svDraw(); }
+$('svClose').onclick=closeView;
+$('svMode').onchange=svDraw; $('svTrue').onchange=svDraw;
+$('svFlip').onchange=e=>{ if (!SV.sc) return; SV.sc.flip=e.target.checked; saveScans(); svDraw(); };
+$('svSpeed').addEventListener('change', e=>{ if (!SV.sc) return; const v=parseFloat(e.target.value);
+  SV.sc.speed = v>0 ? v : null; e.target.value = SV.sc.speed ?? ''; saveScans(); renderScans(); svDraw(); });
+window.addEventListener('resize', ()=>{ if (SV.sc && !$('sv').hidden) svDraw(); });
+
+const SCAN_COLS=['scan_id','label','i','t_send_ms','t_reply_ms','t_mid_ms','reply_ms','status','distance_m','distance_no_offset_m','offset_z_mm',
+  'x_mm','speed_mm_s','interval_ms','meter_mode','wait_ms','since_heartbeat_ms','heartbeat_period_ms','page_hidden',
+  'avoid_heartbeat','reconnects','meter_errors','button_readings_ignored','late_replies_ignored','scan_start_local','scan_start_utc','app_version'];
+function scanCsv(list){
+  const esc=v=> v==null ? '' : /[",\n]/.test(String(v)) ? '"'+String(v).replace(/"/g,'""')+'"' : String(v);
+  const out=[SCAN_COLS.join(',')];
+  for (const sc of list) for (const r of sc.rows){
+    const [i,ts,tr,rv,st,wait,since,hbp,hid]=r;
+    const ok = st==='ok' && rv!=null;
+    const mid = ok ? (ts+tr)/2 : null;
+    const d0 = ok ? rv*0.00005 : null;
+    const row={ scan_id:sc.id, label:sc.label, i, t_send_ms:ts, t_reply_ms:tr, t_mid_ms: mid!=null? +mid.toFixed(1):null, reply_ms: ok? tr-ts : null, status:st,
+      distance_m: ok ? +(d0+(sc.z||0)/1000).toFixed(5) : null, distance_no_offset_m: ok ? +d0.toFixed(5) : null, offset_z_mm: sc.z||0,
+      x_mm: ok && sc.speed ? +(sc.speed*mid/1000).toFixed(2) : null, speed_mm_s: sc.speed, interval_ms: sc.interval, meter_mode: sc.mode,
+      wait_ms: wait, since_heartbeat_ms: since, heartbeat_period_ms: hbp!=null ? Math.round(hbp) : null, page_hidden: hid,
+      avoid_heartbeat: sc.avoidHb==null ? null : (sc.avoidHb?1:0), reconnects: sc.reconnects||0, meter_errors: sc.meter_errors||0,
+      button_readings_ignored: sc.sync_ignored||0, late_replies_ignored: sc.stale||0,
+      scan_start_local: sc.local, scan_start_utc: sc.start, app_version: sc.version };
+    out.push(SCAN_COLS.map(k=>esc(row[k])).join(','));
+  }
+  return out.join('\n');
+}
+function exportScans(list, quiet){
+  if (!list.length){ msg('No scans to export.','warn'); return; }
+  const name = list.length===1 ? `${cfg.prefix||'MeasureUp'}_scan_${list[0].id}${list[0].label?'_'+list[0].label.replace(/[^\w-]/g,''):''}.csv`
+                               : `${cfg.prefix||'MeasureUp'}_scans_${stamp(new Date()).file}.csv`;
+  download(new Blob([scanCsv(list)],{type:'text/csv'}), name);
+  if (list.length===1 && list[0].frames && list[0].frames.length){
+    const sc=list[0], fn=name.replace('_scan_','_frames_');
+    const lines=['scan_id,t_ms,dir,label,hex,app_version', ...sc.frames.map(fr=>[sc.id, fr[0], fr[1], '"'+String(fr[3]).replace(/"/g,'""')+'"', fr[2], sc.version].join(','))];
+    setTimeout(()=>download(new Blob([lines.join('\n')],{type:'text/csv'}), fn), 400);
+  }
+  if (!quiet) msg(`Saved ${name} to Downloads.`,'ok');
+  return name;
+}
+$('btnScan').onclick = ()=>startScan();
+$('btnScanStop').onclick = ()=>{ if (SC.on){ SC.stopReq=true; msg('Stopping after the current reading…'); } };
+$('btnScanCsv').onclick = ()=>exportScans(scans.filter(s=>s!==SC.cur));
+$('btnScanClear').onclick = ()=>{ if (SC.on) return; if (scans.length && confirm(`Delete all ${scans.length} saved scans from this phone?`)){ scans=[]; closeView(); saveScans(); renderScans(); msg('Scans deleted.'); } };
+document.addEventListener('visibilitychange', ()=>{ if (SC.on && SC.cur){ flog('event','', 'page '+document.visibilityState); if (document.visibilityState!=='visible') SC.cur.hidden=true; } });
+$('scLabel').value=cfg.scan.label; $('scSpeed').value=cfg.scan.speed??''; $('scInt').value=cfg.scan.interval; $('scMax').value=cfg.scan.maxMin; $('scAuto').checked=cfg.scan.autoSave;
+$('scLabel').addEventListener('change', e=>{ cfg.scan.label=e.target.value.trim().slice(0,40); e.target.value=cfg.scan.label; saveCfg(); });
+$('scSpeed').addEventListener('change', e=>{ const v=parseFloat(e.target.value); cfg.scan.speed = v>0 ? v : null; e.target.value=cfg.scan.speed??''; saveCfg(); });
+$('scInt').addEventListener('change', e=>{ cfg.scan.interval=Math.max(0, parseInt(e.target.value)||0); e.target.value=cfg.scan.interval; saveCfg(); });
+$('scMax').addEventListener('change', e=>{ const v=parseFloat(e.target.value); cfg.scan.maxMin = v>0 ? v : 10; e.target.value=cfg.scan.maxMin; saveCfg(); });
+$('scAuto').addEventListener('change', e=>{ cfg.scan.autoSave=e.target.checked; saveCfg(); });
+$('scHb').checked=cfg.scan.avoidHb;
+$('scHb').addEventListener('change', e=>{ cfg.scan.avoidHb=e.target.checked; saveCfg(); });
+if (store.get('scanOpen', false)===true) $('scanBox').open=true;
+if (store.get('scanSetOpen', true)===true) $('scanSet').open=true;
+$('scanSet').addEventListener('toggle', ()=>store.set('scanSetOpen', $('scanSet').open));
+$('scanBox').addEventListener('toggle', ()=>store.set('scanOpen', $('scanBox').open));
+renderScans();
+
+// ---------- CSV ----------
+function exportFrames(){
+  if (!rframes.length) return null;
+  const fn=`${cfg.prefix||'MeasureUp'}_frames_log_${stamp(new Date()).file}.csv`;
+  const lines=['time_utc,dir,label,hex,app_version', ...rframes.map(fr=>[fr[0], fr[1], '"'+String(fr[3]).replace(/"/g,'""')+'"', fr[2], VERSION].join(','))];
+  setTimeout(()=>download(new Blob([lines.join('\n')],{type:'text/csv'}), fn), 400);
+  return fn;
+}
+$('btnCsv').onclick = ()=>{
+  if (!log.length){ const fn=exportFrames(); msg(fn ? `No readings yet; saved ${fn}.` : 'Nothing to export yet.', fn?'ok':'warn'); return; }
+  const first = ['file','local','counter','type','distance_m','angle_deg','vertical_m','horizontal_m','distance_no_offset_m','offset_z_mm','meter_height_m'];
+  const all = new Set(); log.forEach(r=>Object.keys(r).forEach(k=>all.add(k)));
+  const cols = [...first.filter(k=>all.has(k)), ...[...all].filter(k=>!first.includes(k))];
+  const esc0 = v => v==null ? '' : /[",\n]/.test(String(v)) ? '"'+String(v).replace(/"/g,'""')+'"' : String(v);
+  const esc = (c,v) => esc0(roundField(c,v));
+  const csv = [cols.join(','), ...log.map(r=>cols.map(c=>esc(c,r[c])).join(','))].join('\n');
+  download(new Blob([csv],{type:'text/csv'}), `${cfg.prefix||'MeasureUp'}_log_${stamp(new Date()).file}.csv`);
+  const fn=exportFrames();
+  msg('CSV saved to Downloads' + (fn ? `, with ${fn}.` : '.'),'ok');
+};
+$('btnClear').onclick = ()=>{ if(log.length && confirm(`Delete all ${log.length} readings from this phone? Photos already saved are not affected.`)){ log=[]; saveLog(); rframes=[]; saveRframes(); renderLog(); msg('Log cleared.'); } };
+
+// ---------- settings ----------
+$('offZ').value=cfg.z; $('prefix').value=cfg.prefix;
+$('optPhoto').checked=cfg.photo; $('optGps').checked=cfg.gps; $('optDevPhoto').checked=cfg.devPhoto;
+$('optFrames').checked=cfg.frames;
+$('optFrames').addEventListener('change', e=>{ cfg.frames=e.target.checked; saveCfg();
+  msg(cfg.frames ? 'Frame log on: saved with readings (Export CSV) and with each scan.' : 'Frame log off.'); });
+$('offZ').addEventListener('change', e=>{ cfg.z=parseFloat(e.target.value)||0; e.target.value=cfg.z; saveCfg(); });
+$('prefix').addEventListener('change', e=>{ cfg.prefix=e.target.value.replace(/[^\w-]/g,'')||'MeasureUp'; e.target.value=cfg.prefix; saveCfg(); });
+$('optPhoto').addEventListener('change', e=>{ cfg.photo=e.target.checked; saveCfg(); applyCamMode(); });
+$('optFull').checked = cfg.source==='app';
+$('optFull').addEventListener('change', e=>{ cfg.source=e.target.checked?'app':'browser'; saveCfg(); applyCamMode(); });
+function applyCamMode(){
+  const full=cfg.source==='app';
+  document.body.classList.toggle('appmode', !browserCam());          // no live view: full quality or photos off
+  $('tglFull').classList.toggle('off', !cfg.photo);
+  $('tglDev').classList.toggle('off', full || !cfg.photo);
+  $('optDevPhoto').disabled = full || !cfg.photo;
+  $('lastPhoto').hidden = !cfg.photo;
+  if (cfg.photo && full && !S.busy) msg('Photos are taken with your camera app, at its own settings.');
+  $('hint').textContent = !cfg.photo ? 'Photos off: readings saved without photos.'
+    : full ? 'Measure opens your camera app. Photograph the laser dot and confirm; the reading is taken as you return.'
+    : 'Photo taken in the browser right after each reading. No camera-app processing, so lower quality.';
+  $('camEmpty').textContent='Starting camera…';
+  if (browserCam()) { if(!S.stream) startCamera(); } else stopCamera();
+}
+$('optGps').addEventListener('change', e=>{ cfg.gps=e.target.checked; saveCfg(); gpsOn(cfg.gps); });
+$('optDevPhoto').addEventListener('change', e=>{ cfg.devPhoto=e.target.checked; saveCfg(); });
+
+if (store.get('logOpen', false)===true) $('logBox').open=true;
+$('logBox').addEventListener('toggle', ()=>store.set('logOpen', $('logBox').open));
+$('ver').textContent = 'v'+VERSION;
+renderLog(); status();
+$('btnCamRe').addEventListener('click', ()=>{ if(browserCam()){ msg('Restarting camera…'); restartCamera().then(()=>msg('Camera restarted.','ok')); } });
+showLastPhoto();
+applyCamMode();
+if (cfg.gps) gpsOn(true);
+if (!navigator.bluetooth) msg('Bluetooth is not available here. Open this page in Chrome on Android over https.','warn');
+})();
+</script>
+</body>
+</html>
