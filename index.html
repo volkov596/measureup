@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!--
+  Measure Up © 2026 Egor Volkov. All rights reserved.
+  Use of the app is free. Copying, modifying or redistributing this code, in whole or in part,
+  requires the author's written permission: egor.volkov@tuta.io
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -145,6 +150,27 @@ details.sub2 summary{font-weight:700;font-size:14px;min-height:40px}
   body.appmode .stage{position:static;height:auto}
 }
 @media (prefers-reduced-motion: reduce){.flash{transition:none}}
+/* About & support */
+.ibtn{width:28px;height:28px;flex:none;border-radius:50%;border:1.5px solid var(--muted);background:transparent;color:var(--muted);
+  font:700 15px/1 Georgia,"Times New Roman",serif;font-style:italic;padding:0;display:inline-grid;place-items:center}
+.ibtn:hover{border-color:var(--brand);color:var(--brand)}
+dialog.about{width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:20px 22px 22px;
+  border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--ink)}
+dialog.about::backdrop{background:rgba(0,0,0,.55)}
+.about .ahead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.about h2{flex:1;margin:0;font-size:20px;font-weight:700}
+.about .x{width:40px;height:40px;flex:none;border-radius:50%;border:1.5px solid var(--line);background:transparent;color:var(--ink);font-size:20px;line-height:1;padding:0}
+.about p{margin:6px 0;color:var(--muted);font-size:15px}
+.about p b{color:var(--ink)}
+.about .wm{color:var(--ink)} .about .wm b{color:var(--brand)}
+.about h3{margin:16px 0 6px;font-size:12px;letter-spacing:1.6px;text-transform:uppercase;color:var(--brand)}
+.about a{color:var(--brand);text-decoration:none;overflow-wrap:anywhere}
+.about a:hover{text-decoration:underline}
+.about .ln{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:15px}
+.about .ln svg{flex:none;width:22px;height:22px;stroke:var(--muted);fill:none;stroke-width:1.6}
+.about .pay{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.about .pay a{border:1.5px solid var(--line);border-radius:10px;padding:8px 16px;color:var(--ink);font-weight:700}
+.about .small{font-size:13px}
 </style>
 </head>
 <body>
@@ -206,6 +232,11 @@ details.sub2 summary{font-weight:700;font-size:14px;min-height:40px}
             <label>Speed <input id="svSpeed" type="number" inputmode="decimal" step="0.01" min="0" placeholder="mm/s"></label>
             <label class="toggle"><input type="checkbox" id="svTrue"> True scale</label>
             <label class="toggle"><input type="checkbox" id="svFlip"> Upside down</label>
+            <select id="svRail" aria-label="Rail sag correction">
+              <option value="off">Rail correction off</option>
+              <option value="fwd">Rail correction, forward scan</option>
+              <option value="back">Rail correction, backward scan</option>
+            </select>
           </div>
           <div class="svtip" id="svTip">Touch the chart to read values.</div>
           <div class="svchart" id="svChart"><svg id="svSvg" role="img" aria-label="Scan profile"></svg></div>
@@ -251,7 +282,25 @@ details.sub2 summary{font-weight:700;font-size:14px;min-height:40px}
         <div class="row"><label class="toggle"><input type="checkbox" id="optFrames"> Save a Bluetooth frame log (diagnostic, for readings and scans)</label></div>
       </details>
     </section>
-    <div class="foot"><span class="wm">Measure<b>Up</b></span><span class="chip">Experimental</span><span class="ver" id="ver"></span></div>
+    <div class="foot"><span class="wm">Measure<b>Up</b></span><button class="ibtn" id="btnAbout" aria-label="About and support" title="About & support">i</button><span class="chip">Experimental</span><span class="ver" id="ver"></span></div>
+    <dialog class="about" id="about" aria-labelledby="aboutTitle">
+      <div class="ahead"><h2 id="aboutTitle">About &amp; support</h2><button class="x" id="aboutClose" aria-label="Close">×</button></div>
+      <p><b class="wm" style="font-size:17px">Measure<b>Up</b></b> — Bluetooth laser-meter logger for field work: readings, photos and slider scans from a Bosch GLM 50-27 CG (readings also from a GLM 100-25 C). Private by design: everything stays on your device.</p>
+      <p class="small">Experimental and unofficial: uses an undocumented meter protocol; not affiliated with or endorsed by Bosch.</p>
+      <h3>Author</h3>
+      <div class="ln"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><a href="mailto:egor.volkov@tuta.io">egor.volkov@tuta.io</a></div>
+      <div class="ln"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="4" height="12"/><circle cx="5" cy="4.5" r="2"/><path d="M10 21V9h4v2c1-1.5 2.4-2.2 4-2.2 2.3 0 3 1.6 3 4V21h-4v-7c0-1.4-.6-2-1.6-2S14 12.7 14 14v7z"/></svg><a href="https://www.linkedin.com/in/egorv" target="_blank" rel="noopener">linkedin.com/in/egorv</a></div>
+      <h3>Licence</h3>
+      <p>© 2026 Egor Volkov. All rights reserved. You are free to use this app. Copying, modifying or redistributing its code, in whole or in part, requires the author's written permission.</p>
+      <h3>Report a bug</h3>
+      <p><a id="aboutIssues" href="https://github.com/volkov596" target="_blank" rel="noopener">github.com/volkov596</a></p>
+      <div id="aboutSupport" hidden>
+        <h3>Support this tool</h3>
+        <p>The tool is free. If it saves you time, a contribution keeps it maintained.</p>
+        <div class="pay"><a id="payKofi" target="_blank" rel="noopener" hidden>Ko-fi</a><a id="payStripe" target="_blank" rel="noopener" hidden>Card / Stripe</a></div>
+      </div>
+      <p class="small" id="aboutVer" style="margin-top:16px"></p>
+    </dialog>
   </div>
 </main>
 
@@ -280,11 +329,33 @@ GLM.CMD_SYNC_ON = GLM.frame(0x55, [0x01, 0x00]); // C0 55 02 01 00 1A
 GLM.CMD_BUTTON = GLM.frame(0x56, [0x00]);        // C0 56 01 00 1E
 GLM.CMD_DIRECT = GLM.frame(0x40, []);            // C0 40 00 EE  direct measure: reply 00 04 <uint32 LE x 0.05 mm>
 
+// Data packet byte 0 = mode × 4 + reference edge (bits 0–1); byte 1 bit 0 = laser on (Bosch MT protocol "EDC" container).
+// Type names are keyed by mode. The 50-27 CG always sends reference 0; the GLM 100-25 C sends 2 (rear edge).
 GLM.TYPES = {
-  0x04: 'Distance', 0x08: 'Continuous', 0x21: 'Angle', 0x28: 'Indirect height',
-  0x2C: 'Indirect (2C)', 0x58: 'Level', 0x00: 'Laser event', 0xF0: 'Mode change', 0xFC: 'Meter error'
+  1: 'Distance', 2: 'Continuous', 8: 'Angle', 10: 'Indirect height', 11: 'Indirect (2C)', 22: 'Level',
+  0: 'Laser event', 60: 'Mode change', 63: 'Meter error'
 };
 GLM.MODES = { 1: 'Distance', 2: 'Continuous', 8: 'Level / angle', 10: 'Indirect height', 11: 'Indirect (2C)' };
+GLM.CMD_INFO = GLM.frame(0x06, []);              // C0 06 00 4A  device info (read only)
+// Product codes from Bosch's MT-protocol SDK (BluetoothUtils). Tested: 3601K72UK0 (50-27 CG), 3601K72YK0 (100-25 C, readings only).
+GLM.MODELS = {
+  '3601K72U00':'GLM 50-27 CG', '3601K72UK0':'GLM 50-27 CG', '3601K72U50':'GLM 50-27 CG', '3601K72T00':'GLM 50-27 C',
+  '3601K72Y00':'GLM 100-25 C', '3601K72YK0':'GLM 100-25 C', '3601K72Y50':'GLM 100-25 C',
+  '3601K72Z00':'GLM 150-27 C', '3601K72Z50':'GLM 150-27 C', '3601K72F00':'GLM 120 C', '3601K72FK0':'GLM 150 C'
+};
+// Device info reply (Bosch SDK layout): date code[4], serial uint32, SW revision uint16, SW main/sub/bug, HW[3], text[13].
+GLM.parseInfo = function (p) {
+  const a = Array.from(p), txt = String.fromCharCode(...a.map(b => b >= 32 && b < 127 ? b : 32));
+  const m = txt.match(/3601K72\w{3}/), code = m ? m[0] : null;
+  const info = { code, model: code ? (GLM.MODELS[code] || null) : null };
+  if (a.length >= 16) {
+    const dv = new DataView(new Uint8Array(a).buffer);
+    info.serial = dv.getUint32(4, true);
+    const pad = n => String(n).padStart(2, '0');
+    info.fw = `${pad(a[10])}.${pad(a[11])}.${pad(a[12])} Rev.${dv.getUint16(8, true)}`;
+  }
+  return info;
+};
 
 // Streaming frame parser. feed(bytes) returns array of decoded frames.
 GLM.Parser = function () {
@@ -312,22 +383,24 @@ GLM.decodeRequest = function (cmd, p, raw) {
   if (cmd === 0x55 && p.length >= 16) {
     const dv = new DataView(new Uint8Array(p).buffer);
     const f = [dv.getFloat32(4, true), dv.getFloat32(8, true), dv.getFloat32(12, true)];
-    const r = { kind: 'sync', type: p[0], flag: p[1], counter: p[2] | (p[3] << 8), f, raw };
-    switch (p[0]) {
-      case 0x04: r.measurement = true; r.distance = f[0]; break;
-      case 0x28: r.measurement = true; r.height = f[0]; r.distance = f[1]; r.angle = f[2]; break;
-      case 0x2C: r.measurement = true; r.other = f[0]; r.distance = f[1]; r.angle = f[2]; break;
-      case 0x21: r.measurement = true; r.angle = f[0]; break;
-      case 0x58: r.measurement = true; r.angle = f[0]; r.angle2 = f[1]; break;
-      case 0x08: r.measurement = true; r.distance = f[0]; r.min = f[1]; r.max = f[2]; break;
-      case 0x00: r.laser = p[1] === 1; break;
-      case 0xF0: r.mode = Math.round(f[0]); break;
-      case 0xFC: r.error = true; break;
+    const m = p[0] >> 2;
+    const r = { kind: 'sync', type: p[0], m, ref: p[0] & 3, flag: p[1], counter: p[2] | (p[3] << 8), f, raw };
+    switch (m) {
+      case 1: r.measurement = true; r.distance = f[0]; break;
+      case 10: r.measurement = true; r.height = f[0]; r.distance = f[1]; r.angle = f[2]; break;
+      case 11: r.measurement = true; r.other = f[0]; r.distance = f[1]; r.angle = f[2]; break;
+      case 8: r.measurement = true; r.angle = f[0]; break;
+      case 22: r.measurement = true; r.angle = f[0]; r.angle2 = f[1]; break;
+      case 2: r.measurement = true; r.distance = f[0]; r.min = f[1]; r.max = f[2]; break;
+      case 0: r.laser = (p[1] & 1) === 1; break;
+      case 60: r.mode = Math.round(f[0]); break;
+      case 63: r.error = true; break;
     }
     return r;
   }
   return { kind: 'request', cmd, payload: p, raw };
 };
+GLM.typeName = f => (GLM.TYPES[f.m] || ('mode ' + f.m)) + (f.ref ? ' ref ' + f.ref : '');
 
 // Geometry. Offsets (mm) = meter reference point relative to camera sensor,
 // camera frame: X right, Y up, Z forward (toward target). Laser parallel to camera axis.
@@ -542,9 +615,9 @@ ${desc}
 <script>
 (function(){
 const $ = id => document.getElementById(id);
-const VERSION = '0.13.0';
+const VERSION = '0.15.0';
 const S = { dev:null, ch:null, connected:false, laser:false, mode:null, lastBeat:0, busy:false,
-  pending:null, stream:null, imgCap:null, pitch:null, roll:null, gps:null, gpsWatch:null, wake:null, wantConnected:false };
+  pending:null, meter:null, infoWait:null, stream:null, imgCap:null, pitch:null, roll:null, gps:null, gpsWatch:null, wake:null, wantConnected:false };
 const parser = new GLM.Parser();
 const SC = { on:false, stopReq:false, cur:null, pending:null, sentAt:0, t0:0, hb:[] };   // scan state; hb = heartbeat arrival times
 // Frame logs: during a scan into the scan (ms since scan start); otherwise, if enabled, into the readings frame log (UTC time).
@@ -592,7 +665,7 @@ function status(){
   dot.className = 'dot ' + (quiet?'warn':'on');
   $('stTitle').textContent = quiet ? 'Connected, no signal' : 'Connected';
   const mode = S.mode!=null ? (GLM.MODES[S.mode]||('mode '+S.mode)) : 'mode not reported yet';
-  $('stSub').textContent = (SC.on ? 'Scanning · ' : '') + mode + ', laser ' + (S.laser?'on':'off');
+  $('stSub').textContent = (SC.on ? 'Scanning · ' : '') + (S.meter && S.meter.model ? S.meter.model + ' · ' : '') + mode + ', laser ' + (S.laser?'on':'off');
   $('btnConnect').textContent='Disconnect'; $('btnMeasure').disabled = S.busy || S.saving;
   scanButtons();
 }
@@ -631,13 +704,28 @@ async function openGatt(){
     S.connected = true; S.lastBeat = Date.now(); wq = Promise.resolve();
     flog('event', '', 'connected');
     await send(GLM.CMD_SYNC_ON);
-    msg('Connected to '+(S.dev.name||'meter')+'.','ok'); status();
+    if (!S.meter || S.meter.id!==S.dev.id) await readMeterInfo();
+    msg('Connected to '+meterName()+'.','ok'); status();
     requestWake();
   }catch(e){
     S.connected=false; status();
     msg('Could not connect: '+e.message+(e.name==='NotFoundError'?' (wrong device picked?)':''),'err');
     if (S.wantConnected) setTimeout(()=>{ if(S.wantConnected && !S.connected) openGatt(); }, 3000);
   }
+}
+// Meter model: from the device-info reply (C0 06, read only), else from the advertised name ("GLM 100-25 C x6464").
+function nameModel(){ const n=(S.dev && S.dev.name)||''; const m=n.replace(/\s+x[0-9a-f]{4}$/i,'').trim(); return /GLM|PLR|Blaze/i.test(m) ? m : null; }
+function meterName(){ return (S.meter && S.meter.model) || (S.dev && S.dev.name) || 'meter'; }
+async function readMeterInfo(){
+  S.meter = { id:S.dev.id, model:nameModel(), code:null, fw:null, serial:null, name:(S.dev.name||null) };
+  const got = new Promise(res=>{ S.infoWait=res; });
+  try{ await send(GLM.CMD_INFO); }catch(e){ S.infoWait=null; return; }
+  const info = await Promise.race([got, sleep(2500).then(()=>null)]);
+  S.infoWait=null;
+  if (info){ Object.assign(S.meter, { code:info.code, fw:info.fw||null, serial:info.serial??null });
+    if (info.model) S.meter.model = info.model;
+    else if (info.code && !S.meter.model) S.meter.model = 'Bosch '+info.code; }
+  flog('event','', 'meter: '+JSON.stringify(S.meter));
 }
 function onDisconnect(){
   S.connected=false; S.ch=null; S.laser=false; status();
@@ -655,9 +743,14 @@ function onData(ev){
   const frames = parser.feed(b);
   S.lastBeat = Date.now();                       // any frame shows the link is alive
   const beatOnly = frames.length>0 && frames.every(f=>f.kind==='heartbeat');
-  if ((SC.on && SC.cur && SC.cur.frames) || (!SC.on && cfg.frames && !beatOnly)) flog('in', hex(b), frames.map(f=>f.kind==='sync' ? 'sync '+(GLM.TYPES[f.type]||f.type) : f.kind==='reply' ? 'reply len '+f.payload.length+' st '+f.status : f.kind).join('+'));
+  if ((SC.on && SC.cur && SC.cur.frames) || (!SC.on && cfg.frames && !beatOnly)) flog('in', hex(b), frames.map(f=>f.kind==='sync' ? 'sync '+GLM.typeName(f) : f.kind==='reply' ? 'reply len '+f.payload.length+' st '+f.status : f.kind).join('+'));
   for (const f of frames){
     if (f.kind==='heartbeat'){ S.lastBeat=Date.now(); SC.hb.push(performance.now()); if (SC.hb.length>16) SC.hb.shift(); continue; }
+    if (f.kind==='reply' && S.infoWait && f.status!==0){ const w=S.infoWait; S.infoWait=null; w(null); continue; }   // device info not supported
+    if (f.kind==='reply' && S.infoWait && f.payload.length>=20){ const w=S.infoWait; S.infoWait=null; w(GLM.parseInfo(f.payload)); continue; }
+    if (f.kind==='reply' && SC.pending && f.status===0 && f.payload.length===4 && f.payload[3]>=0x80){   // negative value: the meter answered without measuring (GLM 100-25 C sends FF FF F4 E3 at once)
+      const p=f.payload; SC.pending({st:'invalid', raw:(p[0]|(p[1]<<8)|(p[2]<<16)|(p[3]<<24))>>>0}); continue;
+    }
     if (f.kind==='reply' && SC.on && !SC.pending && f.payload.length===4){ if (SC.cur) SC.cur.stale=(SC.cur.stale||0)+1; flog('event','','late reply ignored'); continue; }
     if (f.kind==='reply' && SC.pending && performance.now()-SC.sentAt < 280){   // too soon (real replies take >=327 ms) to be a new measurement: a late reply to an earlier command
       if (SC.cur) SC.cur.stale=(SC.cur.stale||0)+1; flog('event','','stale reply ignored'); continue;
@@ -665,21 +758,21 @@ function onData(ev){
     if (f.kind==='reply' && SC.pending){                        // scan: reply to direct measure (C0 40)
       if (f.status===0 && f.payload.length===4){
         const p=f.payload, v=(p[0]|(p[1]<<8)|(p[2]<<16)|(p[3]<<24))>>>0;
-        SC.pending({st:'ok', raw:v}); continue;
+        SC.pending(v===0 ? {st:'zero'} : {st:'ok', raw:v}); continue;   // 0.000 m = no valid measurement (seen at 9 m)
       }
       if (f.status!==0){ SC.pending({st:'status '+f.status}); continue; }
     }
-    if (f.kind==='reply' && f.payload.length===16){ S.laser = f.payload[1]===1; status(); continue; }
+    if (f.kind==='reply' && f.payload.length===16){ S.laser = (f.payload[1]&1)===1; status(); continue; }
     if (f.kind!=='sync') continue;
     S.lastBeat = Date.now();
-    if (f.type===0x00){ S.laser=f.laser; if(S.pending && f.laser) S.pending.laserOn(); }
-    else if (f.type===0xF0){ S.mode=f.mode; if (SC.cur) SC.cur.mode_changes=(SC.cur.mode_changes||0)+1; }
-    else if (f.type===0xFC){
+    if (f.m===0){ S.laser=f.laser; if(S.pending && f.laser) S.pending.laserOn(); }
+    else if (f.m===60){ S.mode=f.mode; if (SC.cur) SC.cur.mode_changes=(SC.cur.mode_changes||0)+1; }
+    else if (f.m===63){
       if (SC.on){ if (SC.cur) SC.cur.meter_errors=(SC.cur.meter_errors||0)+1; if (SC.pending) SC.pending({st:'meter error'}); }
       else { msg('The meter reported an error. Press Measure again, or clear the error on the meter.','warn'); if(S.pending) S.pending.reject(new Error('meter error')); }
     }
     else if (f.measurement && SC.on){ if (SC.cur) SC.cur.sync_ignored=(SC.cur.sync_ignored||0)+1; }   // button reading during a scan: counted, not logged
-    else if (f.measurement){ S.laser=false; const m={0x04:1,0x08:2,0x28:10,0x2C:11,0x21:8,0x58:8}[f.type]; if(m) S.mode=m; onMeasurement(f); }
+    else if (f.measurement){ S.laser=false; const m={1:1,2:2,10:10,11:11,8:8,22:8}[f.m]; if(m) S.mode=m; onMeasurement(f); }
     status();
   }
 }
@@ -759,7 +852,9 @@ async function onMeasurement(f){
   const th = f.angle!=null ? f.angle*Math.PI/180 : null;
   const rec = {
     time: now.toISOString(), local: now.toLocaleString(), app_version: VERSION, source: pend ? 'app' : 'meter button',
-    counter: f.counter, type: GLM.TYPES[f.type]||('0x'+f.type.toString(16)), mode: S.mode,
+    counter: f.counter, type: GLM.TYPES[f.m]||('mode '+f.m), mode: S.mode,
+    meter_model: S.meter?.model ?? null, meter_product_code: S.meter?.code ?? null, meter_firmware: S.meter?.fw ?? null,
+    meter_ref: f.ref, meter_flags: f.flag,
     distance_m: dOff, angle_deg: f.angle ?? null,
     vertical_m: (dOff!=null && th!=null) ? dOff*Math.sin(th) : null,
     horizontal_m: (dOff!=null && th!=null) ? dOff*Math.cos(th) : null,
@@ -808,7 +903,7 @@ async function onMeasurement(f){
       const meta = Object.assign({app:'Measure Up '+VERSION}, rec);
       const desc = describe(rec, off);
       const out = GLM.writeExif(jpg, { description: desc, xpTitle: desc, xpComment: desc, datetime: st.exif, subsec: st.sub,
-        orientation: GLM.readOrientation(jpg), userComment: JSON.stringify(meta),
+        orientation: GLM.readOrientation(jpg), userComment: JSON.stringify(meta), make: 'Bosch '+(rec.meter_model||'GLM')+' + phone',
         gps: (cfg.gps && S.gps) ? {lat:S.gps.lat, lon:S.gps.lon, alt:S.gps.alt} : null });
       download(new Blob([out],{type:'image/jpeg'}), rec.file);
       flash();
@@ -821,7 +916,7 @@ async function onMeasurement(f){
   log.push(rec); saveLog(); renderLog();
 }
 
-const XMP_FIELDS=['counter','type','mode','source','distance_m','angle_deg','vertical_m','horizontal_m','distance_no_offset_m','offset_z_mm','meter_height_m','time','photo_time','photo_to_reading_ms','camera_pitch_deg','camera_roll_deg','lat','lon','app_version'];
+const XMP_FIELDS=['counter','type','mode','meter_model','source','distance_m','angle_deg','vertical_m','horizontal_m','distance_no_offset_m','offset_z_mm','meter_height_m','time','photo_time','photo_to_reading_ms','camera_pitch_deg','camera_roll_deg','lat','lon','app_version'];
 function roundField(k,v){ return typeof v!=='number' ? v : /_m$/.test(k) ? +v.toFixed(5) : /_deg$/.test(k) ? +v.toFixed(3) : v; }
 function describe(rec, off){
   const b=[];
@@ -990,8 +1085,8 @@ function saveScans(){
   catch(e){ msg('Phone storage is full: export and delete old scans.','warn'); return false; }
 }
 function scanStats(sc){
-  const ok = sc.rows.filter(r=>r[4]==='ok');
-  const n = sc.rows.length, fail = sc.rows.filter(r=>r[4]!=='ok' && r[4]!=='reconnected').length;
+  const ok = sc.rows.filter(r=>r[4]==='ok' && r[3]!==0);
+  const n = sc.rows.length, fail = sc.rows.filter(r=>(r[4]!=='ok' || r[3]===0) && r[4]!=='reconnected').length;
   const dur = n ? ((sc.rows[n-1][2] ?? sc.rows[n-1][1]) - sc.rows[0][1])/1000 : 0;
   const rep = ok.map(r=>r[2]-r[1]);
   const gaps = []; for (let i=1;i<ok.length;i++) gaps.push(ok[i][2]-ok[i-1][2]);
@@ -1054,13 +1149,13 @@ async function startScan(){
   if (S.laser){ msg('The laser is on from a Measure press. Take that reading or wait about 20 s for auto-off, then start the scan.','warn'); return; }
   const c=cfg.scan, now=new Date();
   const cur={ id:stamp(now).file, label:c.label||'', start:now.toISOString(), local:now.toLocaleString(),
-    speed: c.speed>0 ? c.speed : null, interval:c.interval||0, maxMin:c.maxMin||10, z:+cfg.z||0, version:VERSION, mode:S.mode,
+    speed: c.speed>0 ? c.speed : null, interval:c.interval||0, maxMin:c.maxMin||10, z:+cfg.z||0, version:VERSION, mode:S.mode, model:S.meter?.model ?? null,
     avoidHb: !!c.avoidHb, rows:[], frames: cfg.frames ? [] : null, stopReason:null, reconnects:0 };
   camLow(true);
   scans.push(cur); SC.cur=cur; SC.on=true; SC.stopReq=false; S.busy=true; status(); renderScans();
   if ($('scanBox').open) openView(cur);          // live profile while scanning
   msg(S.mode!=null && S.mode!==1 ? 'Scanning. Note: the meter is not in single distance mode (untested for scans).' : 'Scanning…', S.mode!=null && S.mode!==1 ? 'warn' : '');
-  const t0=performance.now(); SC.t0=t0; let fails=0, i=0, lastSave=0, lastUi=0; const reps=[];
+  const t0=performance.now(); SC.t0=t0; let fails=0, inv=0, i=0, lastSave=0, lastUi=0; const reps=[];
   flog('event','', 'scan start, heartbeat period '+(hbPeriod()??'unknown')+' ms, avoid heartbeat '+(cur.avoidHb?'on':'off'));
   const row=(ts,tr,rv,st,wait,since)=>cur.rows.push([i++, Math.round(ts-t0), tr==null?null:Math.round(tr-t0), rv, st, wait, since, hbPeriod(), document.visibilityState==='visible'?0:1]);
   try{
@@ -1087,10 +1182,14 @@ async function startScan(){
       SC.pending=null;
       const tr=performance.now();
       if (r.st==='timeout') flog('event','', 'timeout after '+Math.round(tmo)+' ms');
+      if (r.st==='zero') flog('event','', 'zero distance rejected');
+      if (r.st==='invalid') flog('event','', 'meter answered without measuring (value '+r.raw.toString(16).toUpperCase()+')');
+      inv = r.st==='invalid' ? inv+1 : 0;
       row(ts, (r.st==='timeout'||r.st==='send failed'||r.st==='disconnected') ? null : tr, r.raw ?? null, r.st, wait, since);
       if (r.st==='ok'){ fails=0; reps.push(tr-ts); if (tr-lastUi>200){ lastUi=tr; showScan(r.raw); } }
       else if (r.st!=='disconnected'){
         fails++;
+        if (inv>=3 && !reps.length){ cur.stopReason='direct measure not supported by this meter'; break; }
         if (fails>=5){ cur.stopReason='5 failures in a row ('+r.st+')'; break; }
         await sleep(150);                      // short pause; replies arriving <280 ms after the next send are ignored as late
       }
@@ -1108,15 +1207,22 @@ async function startScan(){
     const s=scanStats(cur);
     $('scanStat').textContent='Last scan: '+scanLine(cur)+' ('+cur.stopReason+')';
     const saved = (cfg.scan.autoSave && cur.rows.length) ? exportScans([cur], true) : null;
+    if (/not supported/.test(cur.stopReason) && SV.sc===cur) $('svClose').click();   // nothing to plot
+    if (/not supported/.test(cur.stopReason)) msg(`Scan isn't available for ${S.meter?.model||'this meter'}: it answers the scan command without measuring. Measure works as normal.`,'warn'); else
     msg(`Scan ended (${cur.stopReason}): ${s.ok} readings, ${s.rate.toFixed(2)} Hz, ${s.fail} failed.` + (saved ? ` Saved ${saved}.` : ''), s.ok && !s.fail ? 'ok' : 'warn');
     SC.cur=null; renderScans();
   }
 }
 // ---------- scan viewer: profile chart (inline SVG) ----------
+// Slider rail sag, from the flip test of 1 Oct 2026 (log §4.6): meter sits lower in the middle of the travel.
+// R(u) = a·(uc² − (u−uc)²), u = carriage travel from the start end (mm). Calibrated over u 128–863 mm (0.62 mm),
+// extrapolated beyond (≈1.1 mm at mid-travel relative to the start end). Distance correction: d + R(u) (meter down), d − R(u) (meter up).
+const RAIL = { a:4.599e-6, uc:495.5, travel:1046, cal:[128,863], date:'1 Oct 2026' };
+const railR = u => RAIL.a*(RAIL.uc*RAIL.uc - (u-RAIL.uc)*(u-RAIL.uc));
 const SV = { sc:null, range:[0,1], lastDraw:0, data:null };
 function svSeries(sc){
   const z=sc.z||0, speed=sc.speed||null, pts=[];
-  for (const r of sc.rows){ if (r[4]!=='ok' || r[3]==null || r[2]==null) continue;
+  for (const r of sc.rows){ if (r[4]!=='ok' || !r[3] || r[2]==null) continue;   // !r[3]: also skips 0.000 m in scans from older versions
     const t=(r[1]+r[2])/2000; pts.push({ i:r[0], t, x: speed ? speed*t : t, d: r[3]*0.05 + z, rep: r[2]-r[1] }); }
   return { pts, xmm: !!speed };
 }
@@ -1125,6 +1231,16 @@ function svCompute(){
   const sc=SV.sc; if (!sc) return null;
   const {pts,xmm}=svSeries(sc), mode=$('svMode').value;
   if (!pts.length) return {pts, xmm, mode, note:'No readings yet.'};
+  const rail = xmm ? (sc.rail||'off') : 'off';
+  let railNote='';
+  if (rail!=='off'){
+    const x0=pts[0].x; let outside=0;
+    for (const p of pts){ const u = rail==='fwd' ? p.x-x0 : RAIL.travel-(p.x-x0);
+      if (u<RAIL.cal[0] || u>RAIL.cal[1]) outside++;
+      p.d += (sc.flip?-1:1)*railR(u); }
+    railNote = ` Rail sag removed (flip test ${RAIL.date}, ${rail==='fwd'?'forward':'backward'} scan from the travel end; up to ${railR(RAIL.uc).toFixed(2)} mm)`
+      + (outside ? `; ${Math.round(100*outside/pts.length)}% of points outside the calibrated ${RAIL.cal[0]}–${RAIL.cal[1]} mm, extrapolated.` : '.');
+  }
   const ds=pts.map(p=>p.d), p97=pct(ds,0.97), flip=!!sc.flip;
   let note='';
   if (mode==='dist'){ pts.forEach(p=>p.y=p.d); note = flip ? 'Distance from the meter, drawn for a meter pointing up.' : 'Distance from the meter (axis flipped, so the surface reads the right way up).'; }
@@ -1146,6 +1262,7 @@ function svCompute(){
     if (flip) note += ' Upside down: drawn for a meter pointing up.';
     if (sd!=null) note += ` Scatter about the base ${sd.toFixed(2)} mm (includes the surface's own unevenness).`;
   }
+  note += railNote;
   note += xmm ? ` x = ${SV.sc.speed} mm/s × time (constant speed assumed).` : ' No slider speed set, so x is time. Enter the speed above to get mm.';
   const gaps=[]; for (let k=1;k<pts.length;k++) gaps.push(pts[k].t-pts[k-1].t);
   const g=gaps.length ? pct(gaps,0.5) : 0.4;
@@ -1158,7 +1275,7 @@ function svDraw(){
   const cssv=v=>getComputedStyle(document.body).getPropertyValue(v).trim();
   const svg=$('svSvg'), W=Math.max(200, $('svChart').clientWidth);
   $('svNote').textContent=D.note; $('svTip').textContent='Touch the chart to read values.';
-  $('svTrue').disabled=!D.xmm; if (!D.xmm) $('svTrue').checked=false;
+  $('svTrue').disabled=!D.xmm; if (!D.xmm) $('svTrue').checked=false; $('svRail').disabled=!D.xmm;
   if (!D.pts.length){ svg.setAttribute('viewBox',`0 0 ${W} 60`); svg.setAttribute('height',60); svg.innerHTML=''; return; }
   const x0all=D.pts[0].x, x1all=D.pts[D.pts.length-1].x || x0all+1, span=Math.max(1e-6, x1all-x0all);
   const xr=[x0all+SV.range[0]*span, x0all+SV.range[1]*span];
@@ -1198,7 +1315,7 @@ function svDraw(){
     const tip=$('svTip'); tip.textContent='';
     const b=document.createElement('b'); const isD=D.mode==='dist'; b.textContent=`${best.y.toFixed(isD?2:1)} mm`; tip.append(b, document.createTextNode(isD?' distance':' height'));
     const d=document.createElement('div');
-    d.textContent=(D.xmm?`x ${best.x.toFixed(1)} mm · `:'')+`t ${best.t.toFixed(1)} s · distance ${best.d.toFixed(2)} mm · reply ${Math.round(best.rep)} ms · #${best.i}`;
+    d.textContent=(D.xmm?`x ${best.x.toFixed(1)} mm · `:'')+`t ${best.t.toFixed(1)} s · distance ${best.d.toFixed(2)} mm${SV.sc.rail&&SV.sc.rail!=='off'&&D.xmm?' (rail-corrected)':''} · reply ${Math.round(best.rep)} ms · #${best.i}`;
     tip.appendChild(d); };
   const hit=$('svHit'); hit.addEventListener('pointermove',move); hit.addEventListener('pointerdown',move);
   hit.addEventListener('pointerleave',()=>{ $('svHair').setAttribute('visibility','hidden'); $('svDot').setAttribute('visibility','hidden'); });
@@ -1214,7 +1331,7 @@ function svRanges(){
 function openView(sc){
   SV.sc=sc; SV.range=[0,1];
   $('sv').hidden=false; $('svTitle').textContent=`${sc.label?sc.label+' · ':''}${sc.local}`;
-  $('svSpeed').value = sc.speed ?? ''; $('svFlip').checked = !!sc.flip;
+  $('svSpeed').value = sc.speed ?? ''; $('svFlip').checked = !!sc.flip; $('svRail').value = sc.rail || 'off';
   $('svSpeed').disabled = SC.on && sc===SC.cur;
   svRanges(); svDraw();
   $('sv').scrollIntoView({block:'nearest'});
@@ -1224,28 +1341,30 @@ function svTick(){ if (SV.sc && SV.sc===SC.cur && !$('sv').hidden && performance
 $('svClose').onclick=closeView;
 $('svMode').onchange=svDraw; $('svTrue').onchange=svDraw;
 $('svFlip').onchange=e=>{ if (!SV.sc) return; SV.sc.flip=e.target.checked; saveScans(); svDraw(); };
+$('svRail').onchange=e=>{ if (!SV.sc) return; SV.sc.rail=e.target.value; saveScans(); svDraw(); };
 $('svSpeed').addEventListener('change', e=>{ if (!SV.sc) return; const v=parseFloat(e.target.value);
   SV.sc.speed = v>0 ? v : null; e.target.value = SV.sc.speed ?? ''; saveScans(); renderScans(); svDraw(); });
 window.addEventListener('resize', ()=>{ if (SV.sc && !$('sv').hidden) svDraw(); });
 
 const SCAN_COLS=['scan_id','label','i','t_send_ms','t_reply_ms','t_mid_ms','reply_ms','status','distance_m','distance_no_offset_m','offset_z_mm',
-  'x_mm','speed_mm_s','interval_ms','meter_mode','wait_ms','since_heartbeat_ms','heartbeat_period_ms','page_hidden',
-  'avoid_heartbeat','reconnects','meter_errors','button_readings_ignored','late_replies_ignored','scan_start_local','scan_start_utc','app_version'];
+  'x_mm','speed_mm_s','interval_ms','meter_mode','meter_model','wait_ms','since_heartbeat_ms','heartbeat_period_ms','page_hidden',
+  'avoid_heartbeat','reconnects','meter_errors','button_readings_ignored','late_replies_ignored','scan_start_local','scan_start_utc',
+  'scan_end_utc','stop_reason','app_version'];
 function scanCsv(list){
   const esc=v=> v==null ? '' : /[",\n]/.test(String(v)) ? '"'+String(v).replace(/"/g,'""')+'"' : String(v);
   const out=[SCAN_COLS.join(',')];
   for (const sc of list) for (const r of sc.rows){
     const [i,ts,tr,rv,st,wait,since,hbp,hid]=r;
-    const ok = st==='ok' && rv!=null;
+    const ok = st==='ok' && rv!=null && rv!==0;
     const mid = ok ? (ts+tr)/2 : null;
     const d0 = ok ? rv*0.00005 : null;
-    const row={ scan_id:sc.id, label:sc.label, i, t_send_ms:ts, t_reply_ms:tr, t_mid_ms: mid!=null? +mid.toFixed(1):null, reply_ms: ok? tr-ts : null, status:st,
+    const row={ scan_id:sc.id, label:sc.label, i, t_send_ms:ts, t_reply_ms:tr, t_mid_ms: mid!=null? +mid.toFixed(1):null, reply_ms: ok? tr-ts : null, status: (st==='ok' && rv===0) ? 'zero' : st,
       distance_m: ok ? +(d0+(sc.z||0)/1000).toFixed(5) : null, distance_no_offset_m: ok ? +d0.toFixed(5) : null, offset_z_mm: sc.z||0,
-      x_mm: ok && sc.speed ? +(sc.speed*mid/1000).toFixed(2) : null, speed_mm_s: sc.speed, interval_ms: sc.interval, meter_mode: sc.mode,
+      x_mm: ok && sc.speed ? +(sc.speed*mid/1000).toFixed(2) : null, speed_mm_s: sc.speed, interval_ms: sc.interval, meter_mode: sc.mode, meter_model: sc.model ?? null,
       wait_ms: wait, since_heartbeat_ms: since, heartbeat_period_ms: hbp!=null ? Math.round(hbp) : null, page_hidden: hid,
       avoid_heartbeat: sc.avoidHb==null ? null : (sc.avoidHb?1:0), reconnects: sc.reconnects||0, meter_errors: sc.meter_errors||0,
       button_readings_ignored: sc.sync_ignored||0, late_replies_ignored: sc.stale||0,
-      scan_start_local: sc.local, scan_start_utc: sc.start, app_version: sc.version };
+      scan_start_local: sc.local, scan_start_utc: sc.start, scan_end_utc: sc.end||null, stop_reason: sc.stopReason||null, app_version: sc.version };
     out.push(SCAN_COLS.map(k=>esc(row[k])).join(','));
   }
   return out.join('\n');
@@ -1335,6 +1454,21 @@ $('optDevPhoto').addEventListener('change', e=>{ cfg.devPhoto=e.target.checked; 
 if (store.get('logOpen', false)===true) $('logBox').open=true;
 $('logBox').addEventListener('toggle', ()=>store.set('logOpen', $('logBox').open));
 $('ver').textContent = 'v'+VERSION;
+// ---------- About & support ----------
+const SUPPORT = { kofi:'https://ko-fi.com/yegorv', stripe:'https://buy.stripe.com/fZu00iemkeuX4wo2GUb7y00' };
+(function(){
+  const m = location.hostname.match(/^([\w-]+)\.github\.io$/i), repo = location.pathname.split('/').filter(Boolean)[0];
+  if (m && repo && !/\.html?$/i.test(repo)){ const u=`https://github.com/${m[1]}/${repo}/issues`; $('aboutIssues').href=u; $('aboutIssues').textContent=u.replace('https://',''); }
+  if (SUPPORT.kofi){ $('payKofi').href=SUPPORT.kofi; $('payKofi').hidden=false; }
+  if (SUPPORT.stripe){ $('payStripe').href=SUPPORT.stripe; $('payStripe').hidden=false; }
+  $('aboutSupport').hidden = !(SUPPORT.kofi || SUPPORT.stripe);
+  $('aboutVer').textContent = 'Measure Up v'+VERSION;
+  const dlg=$('about');
+  $('btnAbout').onclick=()=>{ if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open',''); };
+  $('aboutClose').onclick=()=>dlg.close ? dlg.close() : dlg.removeAttribute('open');
+  dlg.addEventListener('click', e=>{ const r=dlg.getBoundingClientRect();     // tap outside the card closes it
+    if (e.clientX<r.left || e.clientX>r.right || e.clientY<r.top || e.clientY>r.bottom) dlg.close(); });
+})();
 renderLog(); status();
 $('btnCamRe').addEventListener('click', ()=>{ if(browserCam()){ msg('Restarting camera…'); restartCamera().then(()=>msg('Camera restarted.','ok')); } });
 showLastPhoto();
