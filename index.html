@@ -615,7 +615,7 @@ ${desc}
 <script>
 (function(){
 const $ = id => document.getElementById(id);
-const VERSION = '0.16.0';
+const VERSION = '0.16.1';
 const S = { dev:null, ch:null, connected:false, laser:false, mode:null, lastBeat:0, busy:false,
   pending:null, meter:null, infoWait:null, stream:null, imgCap:null, pitch:null, roll:null, gps:null, gpsWatch:null, wake:null, wantConnected:false };
 const parser = new GLM.Parser();
@@ -1154,7 +1154,7 @@ function showScan(rawVal){
   $('rDist').innerHTML = d.toFixed(4)+'<small>m</small>';
   $('rAng').textContent='–'; $('rAngL').textContent='angle';
   const P=hbPeriod();
-  $('rSub').textContent='Scan: '+scanLine(sc) + (P ? `, heartbeat ${(P/1000).toFixed(2)} s` : '');
+  $('rSub').textContent='Scan: '+scanLine(sc) + (P ? `, heartbeat ${(P/1000).toFixed(2)} s` : '') + (sc.method==='button' && S.meter?.btnHold!=null ? `, hold-off ${S.meter.btnHold} ms` : '');
 }
 async function startScan(){
   if (!S.connected || SC.on || S.busy || S.saving) return;
@@ -1179,40 +1179,66 @@ async function startScan(){
     if (!S.connected){ cur.stopReason = SC.stopReq ? 'stopped' : !S.wantConnected ? 'disconnected by user' : 'disconnected (no reconnect within 20 s)'; return false; }
     await sleep(500); cur.reconnects++; row(performance.now(), null, null, 'reconnected', null, null); return true;
   };
-  // Button-press scan (meters without a working direct measure, e.g. GLM 100-25 C): each press either switches the
-  // laser on (laser event) or measures (distance packet), so the next press is sent as soon as the meter answers.
-  // If the laser stays on after a reading, every press measures. No heartbeat hold: untested on these meters.
+  // Button-press scan (meters without a working direct measure, e.g. GLM 100-25 C). Each press either switches the
+  // laser on (laser event, ~0.15 s) or measures (distance packet, ~0.55 s). The GLM 100-25 C ignores a press sent
+  // right after a reading (scan of 3 Oct 2026: 54 of 54), so the first press after a reading waits a hold-off that
+  // adapts: +80 ms when that press is ignored, −20 ms when it works (−5 ms once a press has been ignored, so it
+  // only probes downward slowly; fast again at the start of each scan); kept for the session. An ignored laser-on press
+  // is retried after 0.45 s and counted, not logged as a failed reading. If the laser stays on, every press measures.
+  // No heartbeat hold: no collisions seen in 260 button-scan readings.
   const runButtons = async () => {
-    SC.btn=true; let fails=0, lasers=0, lastSave=0, lastUi=0; const reps=[];
+    SC.btn=true; let fails=0, lasers=0, ign=0, lastSave=0, lastUi=0, lastRead=null, readT=null, ignOff=null, seen=false; const reps=[];
+    let hold = S.meter?.btnHold ?? 300;
+    cur.ignored=cur.ignored||0;
     try{
       while (!SC.stopReq){
         if (performance.now()-t0 > cur.maxMin*60000){ cur.stopReason='time limit'; break; }
-        if (!S.connected){ if (!(await relink())) break; fails=0; lasers=0; continue; }
+        if (!S.connected){ if (!(await relink())) break; fails=0; lasers=0; ign=0; lastRead=null; continue; }
+        if (S.mode!=null && S.mode!==1){ cur.stopReason='meter mode changed'; break; }   // mode change can arrive during the hold-off
+        const afterRead = lastRead!=null;                      // first press after a reading: needs the hold-off
+        if (afterRead){ const w=lastRead+hold-performance.now(); if (w>0) await sleep(w); }
+        const laserPress = !S.laser;                           // expect a laser event, else a reading
         const ts=performance.now(), since = SC.hb.length ? Math.round(ts-SC.hb[SC.hb.length-1]) : null;
+        const tmo = laserPress ? 450 : reps.length>=3 ? Math.min(1500, Math.max(800, 2.5*median(reps.slice(-20)))) : 1500;
         const got=new Promise(res=>{ SC.btnWait=res; });
         let f;
-        const tmo = reps.length>=3 ? Math.min(1500, Math.max(800, 2.5*median(reps.slice(-20)))) : 1500;   // a press the meter ignores costs one timeout
         try{ await send(GLM.CMD_BUTTON); f=await Promise.race([got, sleep(tmo).then(()=>null)]); }
         catch(e){ f={err: S.connected ? 'send failed' : 'disconnected'}; }
         SC.btnWait=null;
         const tr=performance.now();
-        if (f && f.err){ if (f.err==='disconnected') continue; fails++; row(ts, null, null, f.err, 0, since); }
-        else if (!f){ fails++; row(ts, null, null, 'timeout', 0, since); flog('event','', 'no answer to button press'); }
-        else if (f.m===0){ if (++lasers>=4){ cur.stopReason='no readings (the laser only switches on and off)'; break; } continue; }
-        else if (f.m===1){
-          lasers=0;
-          if (!(f.distance>0)){ fails++; row(ts, tr, null, 'zero', 0, since); }
-          else { fails=0; reps.push(tr-ts); const raw=Math.round(f.distance/0.00005); row(ts, tr, raw, 'ok', 0, since); if (tr-lastUi>200){ lastUi=tr; showScan(raw); } }
+        if (f && f.err){ if (f.err==='disconnected') continue; fails++; row(ts, null, null, f.err, hold, since); }
+        else if (!f && laserPress){                            // ignored press: no harm, press again
+          cur.ignored++; ign++; if (readT!=null) ignOff=ts-readT;
+          if (afterRead){ hold=Math.min(2000, hold+80); lastRead=null; seen=true; }
+          else if (readT!=null) hold=Math.max(hold, Math.min(2000, Math.round(ts-readT)+80));   // the retry was ignored too: busy period is longer, jump
+          flog('event','', 'press ignored'+(afterRead?', hold-off now '+hold+' ms':''));
+          if (ign>=6){ cur.stopReason='the meter stopped responding to presses'; break; }
+          continue;
         }
-        else if (f.m===63){ fails++; row(ts, tr, null, 'meter error', 0, since); }
+        else if (!f){ fails++; row(ts, null, null, 'timeout', hold, since); flog('event','', 'no reading after press'); lastRead=null; }
+        else if (f.m===0){
+          const ign0=ign; ign=0; if (afterRead) hold=Math.max(0, hold-(seen ? 5 : 20));
+          else if (readT!=null && ign0>=2) hold=Math.max(hold, Math.min(2000, Math.round((ignOff+ts-readT)/2)));   // retries ignored too: busy ended between the last ignored press and this one
+          lastRead=null; readT=null; ignOff=null;
+          if (++lasers>=4){ cur.stopReason='no readings (the laser only switches on and off)'; break; }
+          continue;
+        }
+        else if (f.m===1){
+          lasers=0; ign=0; lastRead=tr; readT=tr; ignOff=null;
+          if (!(f.distance>0)){ fails++; row(ts, tr, null, 'zero', hold, since); }
+          else { fails=0; reps.push(tr-ts); const raw=Math.round(f.distance/0.00005); row(ts, tr, raw, 'ok', hold, since); if (tr-lastUi>200){ lastUi=tr; showScan(raw); } }
+          if (S.laser) lastRead=null;                          // laser left on: next press measures, no hold-off
+        }
+        else if (f.m===63){ fails++; row(ts, tr, null, 'meter error', hold, since); lastRead=tr; }
         else if (f.m===60){ cur.stopReason='meter mode changed'; break; }
         else { cur.stopReason='meter not in single distance mode'; break; }
+        if (S.meter) S.meter.btnHold=hold;
         if (fails>=5){ cur.stopReason='5 failures in a row ('+cur.rows[cur.rows.length-1][4]+')'; break; }
         svTick();
         if (cur.rows.length-lastSave>=50){ lastSave=cur.rows.length; saveScans(); renderScans(); }
         if (cur.interval>0){ const w=ts+cur.interval-performance.now(); if (w>0) await sleep(w); }
       }
-    } finally { SC.btn=false; SC.btnWait=null; }
+    } finally { SC.btn=false; SC.btnWait=null; cur.holdEnd=hold; if (S.meter) S.meter.btnHold=hold; }
   };
   try{
     if (cur.method==='button') await runButtons();
@@ -1400,7 +1426,7 @@ window.addEventListener('resize', ()=>{ if (SV.sc && !$('sv').hidden) svDraw(); 
 
 const SCAN_COLS=['scan_id','label','i','t_send_ms','t_reply_ms','t_mid_ms','reply_ms','status','distance_m','distance_no_offset_m','offset_z_mm',
   'x_mm','speed_mm_s','interval_ms','meter_mode','meter_model','scan_method','wait_ms','since_heartbeat_ms','heartbeat_period_ms','page_hidden',
-  'avoid_heartbeat','reconnects','meter_errors','button_readings_ignored','late_replies_ignored','scan_start_local','scan_start_utc',
+  'avoid_heartbeat','reconnects','meter_errors','button_readings_ignored','late_replies_ignored','presses_ignored','hold_off_end_ms','scan_start_local','scan_start_utc',
   'scan_end_utc','stop_reason','app_version'];
 function scanCsv(list){
   const esc=v=> v==null ? '' : /[",\n]/.test(String(v)) ? '"'+String(v).replace(/"/g,'""')+'"' : String(v);
@@ -1415,7 +1441,7 @@ function scanCsv(list){
       x_mm: ok && sc.speed ? +(sc.speed*mid/1000).toFixed(2) : null, speed_mm_s: sc.speed, interval_ms: sc.interval, meter_mode: sc.mode, meter_model: sc.model ?? null, scan_method: sc.method || 'direct',
       wait_ms: wait, since_heartbeat_ms: since, heartbeat_period_ms: hbp!=null ? Math.round(hbp) : null, page_hidden: hid,
       avoid_heartbeat: sc.avoidHb==null ? null : (sc.avoidHb?1:0), reconnects: sc.reconnects||0, meter_errors: sc.meter_errors||0,
-      button_readings_ignored: sc.sync_ignored||0, late_replies_ignored: sc.stale||0,
+      button_readings_ignored: sc.sync_ignored||0, late_replies_ignored: sc.stale||0, presses_ignored: sc.ignored ?? null, hold_off_end_ms: sc.holdEnd ?? null,
       scan_start_local: sc.local, scan_start_utc: sc.start, scan_end_utc: sc.end||null, stop_reason: sc.stopReason||null, app_version: sc.version };
     out.push(SCAN_COLS.map(k=>esc(row[k])).join(','));
   }
