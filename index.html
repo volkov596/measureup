@@ -615,7 +615,7 @@ ${desc}
 <script>
 (function(){
 const $ = id => document.getElementById(id);
-const VERSION = '0.16.3';
+const VERSION = '0.16.1';
 const S = { dev:null, ch:null, connected:false, laser:false, mode:null, lastBeat:0, busy:false,
   pending:null, meter:null, infoWait:null, stream:null, imgCap:null, pitch:null, roll:null, gps:null, gpsWatch:null, wake:null, wantConnected:false };
 const parser = new GLM.Parser();
@@ -770,7 +770,8 @@ function onData(ev){
       else if (f.m===60) S.mode=f.mode;
       else if (f.m===63 && SC.cur) SC.cur.meter_errors=(SC.cur.meter_errors||0)+1;
       else if (f.measurement){ S.laser=(f.flag&1)===1; const m={1:1,2:2,10:10,11:11,8:8,22:8}[f.m]; if(m) S.mode=m; }
-      SC.btnQ.push(f); if (SC.btnWake){ const w=SC.btnWake; SC.btnWake=null; w(); }
+      if (SC.btnWait){ const w=SC.btnWait; SC.btnWait=null; w(f); }
+      else if (SC.cur){ SC.cur.stale=(SC.cur.stale||0)+1; flog('event','','late packet ignored'); }
       status(); continue;
     }
     if (f.m===0){ S.laser=f.laser; if(S.pending && f.laser) S.pending.laserOn(); }
@@ -1170,7 +1171,7 @@ async function startScan(){
   msg(S.mode!=null && S.mode!==1 ? 'Scanning. Note: the meter is not in single distance mode (untested for scans).' : 'Scanning…', S.mode!=null && S.mode!==1 ? 'warn' : '');
   const t0=performance.now(); SC.t0=t0; let fails=0, inv=0, i=0, lastSave=0, lastUi=0; const reps=[];
   flog('event','', 'scan start, method '+method+', heartbeat period '+(hbPeriod()??'unknown')+' ms, avoid heartbeat '+(cur.avoidHb?'on':'off'));
-  const row=(ts,tr,rv,st,wait,since,early)=>cur.rows.push([i++, Math.round(ts-t0), tr==null?null:Math.round(tr-t0), rv, st, wait, since, hbPeriod(), document.visibilityState==='visible'?0:1, early??null]);
+  const row=(ts,tr,rv,st,wait,since)=>cur.rows.push([i++, Math.round(ts-t0), tr==null?null:Math.round(tr-t0), rv, st, wait, since, hbPeriod(), document.visibilityState==='visible'?0:1]);
   // Link dropped: wait for the app's auto-reconnect. Returns false if the scan should end.
   const relink = async () => {
     const tl=performance.now();
@@ -1178,103 +1179,57 @@ async function startScan(){
     if (!S.connected){ cur.stopReason = SC.stopReq ? 'stopped' : !S.wantConnected ? 'disconnected by user' : 'disconnected (no reconnect within 20 s)'; return false; }
     await sleep(500); cur.reconnects++; row(performance.now(), null, null, 'reconnected', null, null); return true;
   };
-  // Button-press scan (meters without a working direct measure, e.g. GLM 100-25 C). A press either switches the laser
-  // on (laser event ~0.14 s after sending) or measures (reading ~0.58 s after sending). Measured 3 Oct 2026 (v0.16.1):
-  // - The meter ignores a press sent within ~40–95 ms of a reading arriving. The first press after a reading waits a
-  //   hold-off: +80 ms when that press is ignored, then not below (ignored value + 20 ms) for the next 40 readings;
-  //   −20 ms per reading until the first ignore of a scan, −5 ms after; max 400 ms. Remembered per meter model.
-  // - Early press: the measuring press is sent as soon as the laser-on press is acknowledged, without waiting ~80 ms for
-  //   the laser event (works: ~1.45 Hz, 3 Oct 2026). ~10% of early presses gave no reading in time; some of those were
-  //   late readings (they arrived <0.2 s after the next press), so the app waits longer for them and files a reading
-  //   that arrives <0.38 s after a press under the earlier press. Switched off for the session after 3 misses in a row,
-  //   An early miss raises the hold-off by 40 ms (it may be a first press ignored). A miss costs ~0.8 s against a gain of
-  //   ~0.08 s per reading, so the early press only pays below ~10% misses: it starts after 10 plain readings (hold-off
-  //   settles); if more than 10% of the last 20–40 tries miss, plain presses are used for 200 readings, then it is tried
-  //   again. Switched off for the session after 3 misses in a row.
-  // - An ignored press is retried after 0.30 s (0.35 s with the early press) and counted, not logged as a failed reading.
-  // - If the laser stays on after a reading, every press measures. No heartbeat hold: no collisions in 360 readings.
+  // Button-press scan (meters without a working direct measure, e.g. GLM 100-25 C). Each press either switches the
+  // laser on (laser event, ~0.15 s) or measures (distance packet, ~0.55 s). The GLM 100-25 C ignores a press sent
+  // right after a reading (scan of 3 Oct 2026: 54 of 54), so the first press after a reading waits a hold-off that
+  // adapts: +80 ms when that press is ignored, −20 ms when it works (−5 ms once a press has been ignored, so it
+  // only probes downward slowly; fast again at the start of each scan); kept for the session. An ignored laser-on press
+  // is retried after 0.45 s and counted, not logged as a failed reading. If the laser stays on, every press measures.
+  // No heartbeat hold: no collisions seen in 260 button-scan readings.
   const runButtons = async () => {
-    SC.btn=true; SC.btnQ=[];
-    let fails=0, lasers=0, ign=0, lastSave=0, lastUi=0, lastRead=null, readT=null, seen=false, floor=0, floorN=0;
-    const reps=[], key=S.meter?.model||'meter';
-    let hold = Math.min(400, S.meter?.btnHold ?? cfg.btnHold?.[key] ?? 300), lastMeas=null;   // lastMeas: send time of an early press that may still be measuring
-    let early = S.meter?.btnEarly ?? true, eRun=0;
-    const ER = { tries:[], off:10 };                         // early-press record: last 40 tries (1 = miss); off = plain readings still to go
-    cur.ignored=cur.ignored||0; cur.earlyMiss=0; cur.earlyLate=0;
-    const next = async until => {                              // next packet from the meter, or null at the deadline
-      while (!SC.btnQ.length){ const w=until-performance.now(); if (w<=0) return null;
-        await new Promise(res=>{ SC.btnWake=res; setTimeout(res, w); }); SC.btnWake=null; }
-      return SC.btnQ.shift();
-    };
-    const HOLD_MAX=400;                                      // real busy period ≤ ~100 ms (≈600 readings); the 0.3 s retry covers more
-    const missed = afterRead => {                            // the first press after a reading did nothing: raise the hold-off
-      if (afterRead){ floor=Math.min(HOLD_MAX, hold+20); floorN=40; hold=Math.min(HOLD_MAX, hold+80); seen=true; }
-    };
-    const laserOk = afterRead => { ign=0; if (afterRead) hold=Math.max(floor, hold-(seen ? 5 : 20)); };
+    SC.btn=true; let fails=0, lasers=0, ign=0, lastSave=0, lastUi=0, lastRead=null, readT=null, ignOff=null, seen=false; const reps=[];
+    let hold = S.meter?.btnHold ?? 300;
+    cur.ignored=cur.ignored||0;
     try{
       while (!SC.stopReq){
         if (performance.now()-t0 > cur.maxMin*60000){ cur.stopReason='time limit'; break; }
-        if (!S.connected){ if (!(await relink())) break; fails=0; lasers=0; ign=0; lastRead=null; readT=null; continue; }
+        if (!S.connected){ if (!(await relink())) break; fails=0; lasers=0; ign=0; lastRead=null; continue; }
         if (S.mode!=null && S.mode!==1){ cur.stopReason='meter mode changed'; break; }   // mode change can arrive during the hold-off
         const afterRead = lastRead!=null;                      // first press after a reading: needs the hold-off
         if (afterRead){ const w=lastRead+hold-performance.now(); if (w>0) await sleep(w); }
-        const tryEarly = early && ER.off<=0;
-        const laserPress = !S.laser, useEarly = laserPress && tryEarly;
-        if (SC.btnQ.length){ cur.stale=(cur.stale||0)+SC.btnQ.length; flog('event','','late packet ignored'); SC.btnQ.length=0; }
+        const laserPress = !S.laser;                           // expect a laser event, else a reading
         const ts=performance.now(), since = SC.hb.length ? Math.round(ts-SC.hb[SC.hb.length-1]) : null;
-        const tmoR = reps.length>=3 ? Math.min(1500, Math.max(700, 1.25*Math.max(...reps.slice(-20)))) : 1500;   // slowest recent reading + 25% (measured 418–679 ms)
-        const tmoE = tmoR;   // a late early reading arrives soon after the next press (ignored by the busy meter) and is refiled
-        let f=null, err=null, ts2=null;
-        try{ await send(GLM.CMD_BUTTON); if (useEarly){ ts2=performance.now(); await send(GLM.CMD_BUTTON); } }
-        catch(e){ err = S.connected ? 'send failed' : 'disconnected'; }
-        if (err==='disconnected') continue;
-        if (err){ fails++; row(ts, null, null, err, hold, since); }
-        else f = await next(laserPress ? ts+(useEarly ? 350 : 300) : ts+tmoR);
-        let tm=ts;                                             // send time of the press that measured
-        if (!err && useEarly && f && f.m===0 && f.laser){     // laser on: the early press should be measuring now
-          laserOk(afterRead);
-          const g = await next(ts2+tmoE);
-          const eRec = miss => { ER.tries.push(miss?1:0); if (ER.tries.length>40) ER.tries.shift();
-            const n=ER.tries.length, rate=ER.tries.reduce((a,b)=>a+b,0)/n;
-            if (n>=20 && rate>0.10){ ER.off=200; ER.tries=[]; cur.earlyPauses=(cur.earlyPauses||0)+1; flog('event','', `early press: ${Math.round(rate*100)}% misses, plain presses for 200 readings`); } };
-          eRec(!g);
-          if (!g){                                             // the early press did nothing (or the first press was ignored and the early one switched the laser on)
-            eRun++; cur.earlyMiss++; lastMeas=ts2;
-            if (afterRead){ floor=Math.min(HOLD_MAX, hold+20); floorN=40; hold=Math.min(HOLD_MAX, hold+40); seen=true; }   // ambiguous: the first press may have been ignored (hold-off too short)
-            flog('event','', 'early press: no reading within '+Math.round(tmoE)+' ms');
-            if (eRun>=3){ early=false; if (S.meter) S.meter.btnEarly=false; flog('event','', 'early press switched off for this session'); }
-            lastRead=null; readT=null; continue;
-          }
-          eRun=0; f=g; tm=ts2;
-        }
+        const tmo = laserPress ? 450 : reps.length>=3 ? Math.min(1500, Math.max(800, 2.5*median(reps.slice(-20)))) : 1500;
+        const got=new Promise(res=>{ SC.btnWait=res; });
+        let f;
+        try{ await send(GLM.CMD_BUTTON); f=await Promise.race([got, sleep(tmo).then(()=>null)]); }
+        catch(e){ f={err: S.connected ? 'send failed' : 'disconnected'}; }
+        SC.btnWait=null;
         const tr=performance.now();
-        if (err){}
+        if (f && f.err){ if (f.err==='disconnected') continue; fails++; row(ts, null, null, f.err, hold, since); }
         else if (!f && laserPress){                            // ignored press: no harm, press again
-          cur.ignored++; ign++;
-          missed(afterRead); lastRead=null;
+          cur.ignored++; ign++; if (readT!=null) ignOff=ts-readT;
+          if (afterRead){ hold=Math.min(2000, hold+80); lastRead=null; seen=true; }
+          else if (readT!=null) hold=Math.max(hold, Math.min(2000, Math.round(ts-readT)+80));   // the retry was ignored too: busy period is longer, jump
           flog('event','', 'press ignored'+(afterRead?', hold-off now '+hold+' ms':''));
           if (ign>=6){ cur.stopReason='the meter stopped responding to presses'; break; }
           continue;
         }
         else if (!f){ fails++; row(ts, null, null, 'timeout', hold, since); flog('event','', 'no reading after press'); lastRead=null; }
         else if (f.m===0){
-          laserOk(afterRead); lastRead=null; readT=null;
+          const ign0=ign; ign=0; if (afterRead) hold=Math.max(0, hold-(seen ? 5 : 20));
+          else if (readT!=null && ign0>=2) hold=Math.max(hold, Math.min(2000, Math.round((ignOff+ts-readT)/2)));   // retries ignored too: busy ended between the last ignored press and this one
+          lastRead=null; readT=null; ignOff=null;
           if (++lasers>=4){ cur.stopReason='no readings (the laser only switches on and off)'; break; }
           continue;
         }
         else if (f.m===1){
-          lasers=0; ign=0; lastRead=tr; readT=tr;
-          if (tr-tm<380 && lastMeas!=null && lastMeas<tm){ tm=lastMeas; cur.earlyLate=(cur.earlyLate||0)+1; flog('event','', 'late reading filed under the earlier press'); }   // too fast for this press (min 418 ms)
-          lastMeas=null;
-          if (floorN>0 && --floorN===0) floor=0;
-          const ef = tryEarly?1:0;
-          if (!(f.distance>0)){ fails++; row(tm, tr, null, 'zero', hold, since, ef); }
-          else { fails=0; reps.push(tr-tm); const raw=Math.round(f.distance/0.00005); row(tm, tr, raw, 'ok', hold, since, ef); if (tr-lastUi>200){ lastUi=tr; showScan(raw); }
-            if (ER.off>0) ER.off--;
-          }
+          lasers=0; ign=0; lastRead=tr; readT=tr; ignOff=null;
+          if (!(f.distance>0)){ fails++; row(ts, tr, null, 'zero', hold, since); }
+          else { fails=0; reps.push(tr-ts); const raw=Math.round(f.distance/0.00005); row(ts, tr, raw, 'ok', hold, since); if (tr-lastUi>200){ lastUi=tr; showScan(raw); } }
           if (S.laser) lastRead=null;                          // laser left on: next press measures, no hold-off
         }
-        else if (f.m===63){ fails++; row(tm, tr, null, 'meter error', hold, since); lastRead=tr; }
+        else if (f.m===63){ fails++; row(ts, tr, null, 'meter error', hold, since); lastRead=tr; }
         else if (f.m===60){ cur.stopReason='meter mode changed'; break; }
         else { cur.stopReason='meter not in single distance mode'; break; }
         if (S.meter) S.meter.btnHold=hold;
@@ -1283,11 +1238,7 @@ async function startScan(){
         if (cur.rows.length-lastSave>=50){ lastSave=cur.rows.length; saveScans(); renderScans(); }
         if (cur.interval>0){ const w=ts+cur.interval-performance.now(); if (w>0) await sleep(w); }
       }
-    } finally {
-      SC.btn=false; SC.btnWake=null; cur.holdEnd=hold; cur.early=(early && ER.off<=0)?1:0;
-      if (S.meter) S.meter.btnHold=hold;
-      cfg.btnHold=Object.assign({}, cfg.btnHold, {[key]:hold}); saveCfg();
-    }
+    } finally { SC.btn=false; SC.btnWait=null; cur.holdEnd=hold; if (S.meter) S.meter.btnHold=hold; }
   };
   try{
     if (cur.method==='button') await runButtons();
@@ -1474,14 +1425,14 @@ $('svSpeed').addEventListener('change', e=>{ if (!SV.sc) return; const v=parseFl
 window.addEventListener('resize', ()=>{ if (SV.sc && !$('sv').hidden) svDraw(); });
 
 const SCAN_COLS=['scan_id','label','i','t_send_ms','t_reply_ms','t_mid_ms','reply_ms','status','distance_m','distance_no_offset_m','offset_z_mm',
-  'x_mm','speed_mm_s','interval_ms','meter_mode','meter_model','scan_method','early','wait_ms','since_heartbeat_ms','heartbeat_period_ms','page_hidden',
-  'avoid_heartbeat','reconnects','meter_errors','button_readings_ignored','late_replies_ignored','presses_ignored','hold_off_end_ms','early_press','early_misses','late_readings_refiled','early_pauses','scan_start_local','scan_start_utc',
+  'x_mm','speed_mm_s','interval_ms','meter_mode','meter_model','scan_method','wait_ms','since_heartbeat_ms','heartbeat_period_ms','page_hidden',
+  'avoid_heartbeat','reconnects','meter_errors','button_readings_ignored','late_replies_ignored','presses_ignored','hold_off_end_ms','scan_start_local','scan_start_utc',
   'scan_end_utc','stop_reason','app_version'];
 function scanCsv(list){
   const esc=v=> v==null ? '' : /[",\n]/.test(String(v)) ? '"'+String(v).replace(/"/g,'""')+'"' : String(v);
   const out=[SCAN_COLS.join(',')];
   for (const sc of list) for (const r of sc.rows){
-    const [i,ts,tr,rv,st,wait,since,hbp,hid,early]=r;
+    const [i,ts,tr,rv,st,wait,since,hbp,hid]=r;
     const ok = st==='ok' && rv!=null && rv!==0;
     const mid = ok ? (ts+tr)/2 : null;
     const d0 = ok ? rv*0.00005 : null;
@@ -1490,7 +1441,7 @@ function scanCsv(list){
       x_mm: ok && sc.speed ? +(sc.speed*mid/1000).toFixed(2) : null, speed_mm_s: sc.speed, interval_ms: sc.interval, meter_mode: sc.mode, meter_model: sc.model ?? null, scan_method: sc.method || 'direct',
       wait_ms: wait, since_heartbeat_ms: since, heartbeat_period_ms: hbp!=null ? Math.round(hbp) : null, page_hidden: hid,
       avoid_heartbeat: sc.avoidHb==null ? null : (sc.avoidHb?1:0), reconnects: sc.reconnects||0, meter_errors: sc.meter_errors||0,
-      button_readings_ignored: sc.sync_ignored||0, late_replies_ignored: sc.stale||0, presses_ignored: sc.ignored ?? null, hold_off_end_ms: sc.holdEnd ?? null, early_press: sc.early ?? null, early_misses: sc.earlyMiss ?? null, late_readings_refiled: sc.earlyLate ?? null, early_pauses: sc.earlyPauses ?? null, early,
+      button_readings_ignored: sc.sync_ignored||0, late_replies_ignored: sc.stale||0, presses_ignored: sc.ignored ?? null, hold_off_end_ms: sc.holdEnd ?? null,
       scan_start_local: sc.local, scan_start_utc: sc.start, scan_end_utc: sc.end||null, stop_reason: sc.stopReason||null, app_version: sc.version };
     out.push(SCAN_COLS.map(k=>esc(row[k])).join(','));
   }
